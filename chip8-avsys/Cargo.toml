@@ -1,0 +1,10 @@
+[package]
+name = "chip8-avsys"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sdl2 = { version = "0.35", features = ['bundled'] }
+chip8-vm = { path = "../chip8-vm" }
