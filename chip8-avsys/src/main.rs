@@ -31,11 +31,26 @@ pub fn main() -> Result<(), String> {
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     let mut event_pump = sdl_context.event_pump()?;
 
+    chip8.screen_set_pixel(0, 0);
+
     'running: loop {
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
         canvas.set_draw_color(Color::RGB(255, 255, 255));
-        canvas.draw_rect(Rect::new(0, 0, 40, 40)).unwrap();
+
+        for x in 0..CHIP8_WIDTH {
+            for y in 0..CHIP8_HEIGHT {
+                if chip8.screen_is_pixel_set(x as usize, y as usize).unwrap() {
+                    canvas.fill_rect(Rect::new(
+                        (x * CHIP8_WINDOW_MULTIPLIER) as i32, 
+                        (y * CHIP8_WINDOW_MULTIPLIER) as i32, 
+                        CHIP8_WINDOW_MULTIPLIER, 
+                    CHIP8_WINDOW_MULTIPLIER, 
+                    )).unwrap();
+                }
+            }
+        }
+        
         canvas.present();
 
         for event in event_pump.poll_iter() {

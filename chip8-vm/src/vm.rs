@@ -1,4 +1,4 @@
-use crate::{errors::VMError, memory::RAM, cpu::Registers, cpu::Stack, io::Keyboard};
+use crate::{errors::VMError, memory::RAM, cpu::Registers, cpu::Stack, io::Keyboard, io::Screen};
 
 #[derive(Default)]
 pub struct VM {
@@ -6,6 +6,7 @@ pub struct VM {
     registers: Registers,
     stack: Stack,
     keyboard: Keyboard,
+    screen: Screen,
 }
 
 impl VM {
@@ -48,6 +49,14 @@ impl VM {
 
     pub fn keyboard_map_to_vkey(&mut self, key: i32) -> Result<usize, VMError> {
         self.keyboard.map_to_vkey(key)
+    }
+
+    pub fn screen_is_pixel_set(&mut self, x: usize, y :usize) -> Result<bool, VMError> {
+        self.screen.is_pixel_set(x, y)
+    }
+
+    pub fn screen_set_pixel(&mut self, x: usize, y :usize) -> Result<(), VMError> {
+        self.screen.set_pixel(x, y)
     }
 
 }

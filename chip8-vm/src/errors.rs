@@ -8,7 +8,10 @@ pub enum VMError {
     StackOverflow,
     KeyMapNotFound,
     ReservedMemoryWriteAttempt,
+    ScreenOutOfBounds(usize, usize),
 }
+
+impl Error for VMError {}
 
 impl fmt::Display for VMError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -26,10 +29,12 @@ impl fmt::Display for VMError {
                 write!(f, "key map not found")
             }
             VMError::ReservedMemoryWriteAttempt => {
-                write!(f, "Reserved memory write attempt (0x000 to 0x1FF)")
+                write!(f, "reserved memory write attempt (0x000 to 0x1FF)")
+            },
+            VMError::ScreenOutOfBounds(x, y) => {
+                write!(f, "screen pixel set/unset out of bounds: x={} y={}", x, y)
             },
         }
     }
 }
 
-impl Error for VMError {}
