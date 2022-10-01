@@ -23,6 +23,11 @@ impl VM {
         self.memory.get(index)
     }
 
+    pub fn memory_get_ref(&mut self, index: usize) -> Result<&[u8], VMError> {
+        let memref = self.memory.get_ref(index);
+        Ok(memref)
+    }
+
     pub fn stack_push(&mut self, value: u16) -> Result<(), VMError> {
         self.registers.inc_sp()?;
         self.stack.push(self.registers.sp - 1, value)?;
@@ -57,6 +62,11 @@ impl VM {
 
     pub fn screen_set_pixel(&mut self, x: usize, y :usize) -> Result<(), VMError> {
         self.screen.set_pixel(x, y)
+    }
+
+    pub fn screen_draw_sprite(&mut self, x: usize, y :usize, offset: usize, sprite_bytes: u32) -> Result<bool, VMError> {
+        let pixel_collision = self.screen.draw_sprite(x, y, offset, &self.memory, sprite_bytes as usize);
+        pixel_collision
     }
 
 }

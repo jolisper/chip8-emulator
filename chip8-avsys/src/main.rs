@@ -15,6 +15,23 @@ use crate::config::*;
 pub fn main() -> Result<(), String> {
     let mut chip8: VM = VM::new();
 
+    chip8.screen_draw_sprite(00, 0, 0x00, 5);
+    chip8.screen_draw_sprite(05, 0, 0x05, 5);
+    chip8.screen_draw_sprite(10, 0, 0x0a, 5);
+    chip8.screen_draw_sprite(15, 0, 0x0f, 5);
+    chip8.screen_draw_sprite(20, 0, 0x14, 5);
+    chip8.screen_draw_sprite(25, 0, 0x19, 5);
+    chip8.screen_draw_sprite(30, 0, 0x1e, 5);
+    chip8.screen_draw_sprite(35, 0, 0x23, 5);
+    chip8.screen_draw_sprite(40, 0, 0x28, 5);
+    chip8.screen_draw_sprite(45, 0, 0x2d, 5);
+    chip8.screen_draw_sprite(50, 0, 0x32, 5);
+    chip8.screen_draw_sprite(55, 0, 0x37, 5);
+    chip8.screen_draw_sprite(60, 0, 0x3c, 5);
+    chip8.screen_draw_sprite(00, 6, 0x41, 5);
+    chip8.screen_draw_sprite(05, 6, 0x46, 5);
+    chip8.screen_draw_sprite(10, 6, 0x4b, 5);
+
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
@@ -30,8 +47,6 @@ pub fn main() -> Result<(), String> {
 
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     let mut event_pump = sdl_context.event_pump()?;
-
-    chip8.screen_set_pixel(0, 0);
 
     'running: loop {
         canvas.set_draw_color(Color::RGB(0, 0, 0));

@@ -73,4 +73,8 @@ impl RAM {
             None => Err(VMError::MemoryOutOfBounds(index)),
         }
     }
+
+    pub(crate) fn get_ref(&self, offset: usize) -> &[u8] {
+        &self.memory[offset..]
+    }
 }

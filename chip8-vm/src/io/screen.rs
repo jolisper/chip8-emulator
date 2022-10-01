@@ -1,4 +1,4 @@
-use crate::{config::{CHIP8_SCREEN_HEIGHT, CHIP8_SCREEN_WIDTH}, errors::VMError};
+use crate::{config::{CHIP8_SCREEN_HEIGHT, CHIP8_SCREEN_WIDTH}, errors::VMError, memory::RAM};
 
 pub struct Screen {
     pixels: [[bool; CHIP8_SCREEN_HEIGHT]; CHIP8_SCREEN_WIDTH]
@@ -33,6 +33,22 @@ impl Screen {
             return Err(VMError::ScreenOutOfBounds(x, y))
         }
         Ok(self.pixels[x][y])
+    }
+
+    pub(crate) fn draw_sprite(&mut self, x: usize, y: usize, offset: usize, ram: &RAM, tbytes: usize) -> Result<bool, VMError> {
+        let mut pixel_collision = false;
+
+        for ly in 0..tbytes {
+            let sprite_byte = ram.get(offset + ly)?;
+            for lx in 0..8 {
+                // if pixel byte is zero, nothing to draw
+                if sprite_byte & (0b1000_0000 >> lx) == 0b0000_0000 {
+                    continue
+                }
+                self.pixels[lx+x][ly+y] = true;
+            }
+        }
+        Ok(pixel_collision)
     }
 
     fn check_bounds(&self, x: usize, y: usize) -> bool {
