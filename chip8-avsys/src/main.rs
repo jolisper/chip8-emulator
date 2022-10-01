@@ -35,6 +35,17 @@ pub fn main() -> Result<(), String> {
     // Wrapped print of "A" sprint
     chip8.screen_draw_sprite(62, 12, 0x32, 5);
 
+    // Print same sprite in the same position twice, check collision:
+    chip8.screen_draw_sprite(32, 16, 0x32, 5);
+    if !chip8.screen_draw_sprite(32, 16, 0x32, 5).unwrap() {
+        panic!("Collision must be detected")
+    }
+
+    // Check on/off pixel behavior when is set again
+    if chip8.screen_is_pixel_set(60, 16).unwrap() {
+        panic!("The pixel must be unset")
+    }
+
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 

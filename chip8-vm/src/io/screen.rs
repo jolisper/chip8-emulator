@@ -45,7 +45,12 @@ impl Screen {
                 if sprite_byte & (0b1000_0000 >> lx) == 0b0000_0000 {
                     continue
                 }
-                self.pixels[(lx+x) % CHIP8_SCREEN_WIDTH][(ly+y) % CHIP8_SCREEN_HEIGHT] = true;
+
+                // Collision detection.
+                pixel_collision = self.pixels[(lx+x) % CHIP8_SCREEN_WIDTH][(ly+y) % CHIP8_SCREEN_HEIGHT];
+
+                // XOR pixels, if pixel is already "on" then go "off".
+                self.pixels[(lx+x) % CHIP8_SCREEN_WIDTH][(ly+y) % CHIP8_SCREEN_HEIGHT] ^= true;
             }
         }
         Ok(pixel_collision)
