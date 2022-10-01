@@ -45,7 +45,7 @@ impl Screen {
                 if sprite_byte & (0b1000_0000 >> lx) == 0b0000_0000 {
                     continue
                 }
-                self.pixels[lx+x][ly+y] = true;
+                self.pixels[(lx+x) % CHIP8_SCREEN_WIDTH][(ly+y) % CHIP8_SCREEN_HEIGHT] = true;
             }
         }
         Ok(pixel_collision)

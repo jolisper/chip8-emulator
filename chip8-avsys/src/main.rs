@@ -32,6 +32,9 @@ pub fn main() -> Result<(), String> {
     chip8.screen_draw_sprite(05, 6, 0x46, 5);
     chip8.screen_draw_sprite(10, 6, 0x4b, 5);
 
+    // Wrapped print of "A" sprint
+    chip8.screen_draw_sprite(62, 12, 0x32, 5);
+
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
