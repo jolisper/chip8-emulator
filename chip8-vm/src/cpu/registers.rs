@@ -53,6 +53,10 @@ impl Registers {
         self.dt -= 1;
     }
 
+    pub(crate) fn dec_st(&mut self) {
+        self.st -= 1;
+    }
+
     fn validate_sp_in_bounds(&self) -> Result<(), VMError>{
         if (self.sp as usize) < CHIP8_TOTAL_STACK_DEPTH && self.sp >= 0 {
             return Ok(())

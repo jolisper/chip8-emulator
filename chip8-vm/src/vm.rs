@@ -81,4 +81,16 @@ impl VM {
         self.registers.dec_dt();
     }
 
+    pub fn registers_set_st(&mut self, value: u8) {
+        self.registers.st = value;
+    }
+
+    pub fn registers_st(&mut self) -> u8 {
+        self.registers.st
+    }
+
+    pub fn registers_dec_st(&mut self) {
+        self.registers.dec_st();
+    }
+
 }

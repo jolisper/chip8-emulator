@@ -2,6 +2,8 @@ mod config;
 
 extern crate sdl2;
 
+use sdl2::AudioSubsystem;
+use sdl2::audio::{AudioSpecDesired, AudioCallback, AudioSpec};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
@@ -10,6 +12,28 @@ use std::time::Duration;
 
 use chip8_vm::VM;
 use crate::config::*;
+
+struct SquareWave {
+    phase_inc: f32,
+    phase: f32,
+    volume: f32
+}
+
+impl AudioCallback for SquareWave {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [f32]) {
+        // Generate a square wave
+        for x in out.iter_mut() {
+            *x = if self.phase <= 0.5 {
+                self.volume
+            } else {
+                -self.volume
+            };
+            self.phase = (self.phase + self.phase_inc) % 1.0;
+        }
+    }
+}
 
 #[allow(unused)]
 pub fn main() -> Result<(), String> {
@@ -47,10 +71,15 @@ pub fn main() -> Result<(), String> {
     }
 
     // Set delay timer
-    chip8.registers_set_dt(255);
+    chip8.registers_set_dt(10);
+
+    // Set delay timer
+    chip8.registers_set_st(20);
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
+    let audio_subsystem = sdl_context.audio()?;
+    let device = build_audio_device(&audio_subsystem); 
 
     let window = video_subsystem
         .window(
@@ -107,12 +136,35 @@ pub fn main() -> Result<(), String> {
         if chip8.registers_dt() > 0 {
             std::thread::sleep(Duration::from_millis(100));
             chip8.registers_dec_dt();
-            println!("delay!");
         }
+
+        if chip8.registers_st() > 0 {
+            // Start playback
+            device.resume();
+            chip8.registers_dec_st();
+        } else {
+            device.pause();
+        } 
 
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 30));
         // The rest of the game loop goes here...
     }
 
     Ok(())
+}
+
+fn build_audio_device(audio_subsystem: &AudioSubsystem) -> sdl2::audio::AudioDevice<SquareWave> {
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44100),
+        channels: Some(1),  // mono
+        samples: None       // default sample size
+    };
+    let audio_spec = |spec: AudioSpec| {
+        SquareWave {
+            phase_inc: 440.0 / spec.freq as f32,
+            phase: 0.0,
+            volume: 0.25
+        }
+    };
+    audio_subsystem.open_playback(None, &desired_spec,  audio_spec).unwrap()
 }
