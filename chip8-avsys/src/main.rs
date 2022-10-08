@@ -46,6 +46,9 @@ pub fn main() -> Result<(), String> {
         panic!("The pixel must be unset")
     }
 
+    // Set delay timer
+    chip8.registers_set_dt(255);
+
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
@@ -99,6 +102,12 @@ pub fn main() -> Result<(), String> {
                 }
                 _ => {}
             }
+        }
+
+        if chip8.registers_dt() > 0 {
+            std::thread::sleep(Duration::from_millis(100));
+            chip8.registers_dec_dt();
+            println!("delay!");
         }
 
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 30));

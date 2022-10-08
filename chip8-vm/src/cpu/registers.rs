@@ -25,7 +25,7 @@ pub struct Registers {
     pub i: u16,
 
     /// Sound delay and timer registers.
-    pub sd: u8,
+    pub dt: u8,
     pub st: u8,
 
     /// Program counter.
@@ -49,12 +49,17 @@ impl Registers {
         Ok(())
     }
 
-    pub(crate) fn validate_sp_in_bounds(&self) -> Result<(), VMError>{
+    pub(crate) fn dec_dt(&mut self) {
+        self.dt -= 1;
+    }
+
+    fn validate_sp_in_bounds(&self) -> Result<(), VMError>{
         if (self.sp as usize) < CHIP8_TOTAL_STACK_DEPTH && self.sp >= 0 {
             return Ok(())
         } 
         Err(VMError::StackOverflow)
     }
+
 }
 
 

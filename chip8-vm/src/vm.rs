@@ -1,4 +1,4 @@
-use crate::{errors::VMError, memory::RAM, cpu::Registers, cpu::Stack, io::Keyboard, io::Screen};
+use crate::{errors::VMError, memory::RAM, cpu::Registers, cpu::Stack, io::{Keyboard, Screen}};
 
 #[derive(Default)]
 pub struct VM {
@@ -67,6 +67,18 @@ impl VM {
     pub fn screen_draw_sprite(&mut self, x: usize, y :usize, offset: usize, sprite_bytes: u32) -> Result<bool, VMError> {
         let pixel_collision = self.screen.draw_sprite(x, y, offset, &self.memory, sprite_bytes as usize);
         pixel_collision
+    }
+    
+    pub fn registers_set_dt(&mut self, value: u8) {
+        self.registers.dt = value;
+    }
+
+    pub fn registers_dt(&mut self) -> u8 {
+        self.registers.dt
+    }
+
+    pub fn registers_dec_dt(&mut self) {
+        self.registers.dec_dt();
     }
 
 }
