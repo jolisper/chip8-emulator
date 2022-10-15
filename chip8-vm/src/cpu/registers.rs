@@ -1,4 +1,4 @@
-use crate::{errors::VMError, config::CHIP8_TOTAL_STACK_DEPTH};
+use crate::{errors::VMError, config::{CHIP8_TOTAL_STACK_DEPTH}};
 
 #[derive(Default)]
 pub struct Registers {
@@ -62,6 +62,10 @@ impl Registers {
             return Ok(())
         } 
         Err(VMError::StackOverflow)
+    }
+
+    pub(crate) fn set_pc(&mut self, value: u16) {
+        self.pc = value;
     }
 
 }

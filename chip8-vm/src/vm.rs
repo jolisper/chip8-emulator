@@ -1,4 +1,4 @@
-use crate::{errors::VMError, memory::RAM, cpu::Registers, cpu::Stack, io::{Keyboard, Screen}};
+use crate::{errors::VMError, memory::RAM, cpu::Registers, cpu::Stack, io::{Keyboard, Screen}, config::{CHIP8_PROGRAM_LOAD_ADDRESS, CHIP8_MEM_SIZE}};
 
 #[derive(Default)]
 pub struct VM {
@@ -91,6 +91,17 @@ impl VM {
 
     pub fn registers_dec_st(&mut self) {
         self.registers.dec_st();
+    }
+
+    pub fn load_program(&mut self, buf: &[u8]) -> Result<(), VMError> {
+        self.memory.load_program(buf)?;
+        self.registers.set_pc(CHIP8_PROGRAM_LOAD_ADDRESS as u16);
+        Ok(())
+    }
+
+    #[allow(unused)]
+    pub fn memory_dump(&self) {
+        self.memory.dump();
     }
 
 }

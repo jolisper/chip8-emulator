@@ -1,8 +1,8 @@
-mod vm;
-mod cpu;
-mod memory;
-mod io;
 mod config;
+mod cpu;
 mod errors;
+mod io;
+mod memory;
+mod vm;
 
 pub use vm::VM;

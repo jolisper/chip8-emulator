@@ -39,6 +39,9 @@ impl AudioCallback for SquareWave {
 pub fn main() -> Result<(), String> {
     let mut chip8: VM = VM::new();
 
+    chip8.load_program(b"Hello world!");
+    chip8.memory_dump();
+
     chip8.screen_draw_sprite(00, 0, 0x00, 5);
     chip8.screen_draw_sprite(05, 0, 0x05, 5);
     chip8.screen_draw_sprite(10, 0, 0x0a, 5);
@@ -73,7 +76,7 @@ pub fn main() -> Result<(), String> {
     // Set delay timer
     chip8.registers_set_dt(10);
 
-    // Set delay timer
+    // Set sound timer
     chip8.registers_set_st(20);
 
     let sdl_context = sdl2::init()?;

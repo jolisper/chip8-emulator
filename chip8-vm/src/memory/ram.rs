@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::errors::VMError;
 
 use crate::{config::*};
@@ -36,6 +38,11 @@ const CHARSET: &'static [u8] = &[
     // F
     0xf0, 0x80, 0xf0, 0x80, 0x80,
 ];
+
+const COLUMNS_PER_LINE: u32 = 8;
+
+macro_rules! memaddr_pattern {() => ("{:#06X} | ")}
+macro_rules! byte_pattern {() => ("{:#04X} ")}
 
 pub struct RAM {
     memory: [u8; CHIP8_MEM_SIZE],
@@ -76,5 +83,28 @@ impl RAM {
 
     pub(crate) fn get_ref(&self, offset: usize) -> &[u8] {
         &self.memory[offset..]
+    }
+
+    pub(crate) fn load_program(&mut self, buffer: &[u8]) -> Result<(), VMError> {
+        if !(buffer.len() + CHIP8_PROGRAM_LOAD_ADDRESS < CHIP8_MEM_SIZE) {
+            return Err(VMError::ProgramSizeOverflow)
+        }
+        self.memory[CHIP8_PROGRAM_LOAD_ADDRESS..CHIP8_PROGRAM_LOAD_ADDRESS+buffer.len()].copy_from_slice(buffer);
+        Ok(())
+    }
+
+    pub(crate) fn dump(&self) {
+        let mut colums_count = 1;
+        print!(memaddr_pattern!(), 0); 
+        for (memaddr, byte) in self.memory.iter().enumerate() {
+            if colums_count > COLUMNS_PER_LINE {
+                colums_count = 1;
+                println!();
+                print!(memaddr_pattern!(), memaddr); 
+            }
+            print!(byte_pattern!(), byte);
+            colums_count += 1;
+        }
+        std::io::stdout().flush().unwrap();
     }
 }

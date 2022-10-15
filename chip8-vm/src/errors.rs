@@ -9,6 +9,7 @@ pub enum VMError {
     KeyMapNotFound,
     ReservedMemoryWriteAttempt,
     ScreenOutOfBounds(usize, usize),
+    ProgramSizeOverflow,
 }
 
 impl Error for VMError {}
@@ -33,6 +34,9 @@ impl fmt::Display for VMError {
             },
             VMError::ScreenOutOfBounds(x, y) => {
                 write!(f, "screen pixel set/unset out of bounds: x={} y={}", x, y)
+            },
+            VMError::ProgramSizeOverflow => {
+                write!(f, "the program size si to big to be loaded in memmory")
             },
         }
     }
