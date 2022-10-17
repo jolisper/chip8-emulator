@@ -1,5 +1,5 @@
 use core::fmt;
-use std::error::Error;
+use std::{error::Error, fmt::Debug};
 
 #[derive(Debug)]
 pub enum VMError {
@@ -10,6 +10,7 @@ pub enum VMError {
     ReservedMemoryWriteAttempt,
     ScreenOutOfBounds(usize, usize),
     ProgramSizeOverflow,
+    ProgramCounterOverflow,
 }
 
 impl Error for VMError {}
@@ -38,7 +39,15 @@ impl fmt::Display for VMError {
             VMError::ProgramSizeOverflow => {
                 write!(f, "the program size si to big to be loaded in memmory")
             },
+            VMError::ProgramCounterOverflow => {
+                write!(f, "the PC register overflow")
+            },
         }
     }
 }
 
+impl From<VMError> for String {
+    fn from(vmerr: VMError) -> Self {
+       vmerr.to_string() 
+    }
+}

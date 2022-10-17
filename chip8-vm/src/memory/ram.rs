@@ -93,6 +93,14 @@ impl RAM {
         Ok(())
     }
 
+    pub(crate) fn get_opcode(&self, index: usize) -> Result<u16, VMError> {
+        if !(index + 1 < CHIP8_MEM_SIZE) {
+            return Err(VMError::MemoryOutOfBounds(index));
+        }
+        let instruction = ((self.memory[index] as u16) << 8) | self.memory[index + 1] as u16;
+        Ok(instruction)
+    }
+
     pub(crate) fn dump(&self) {
         let mut colums_count = 1;
         print!(memaddr_pattern!(), 0); 

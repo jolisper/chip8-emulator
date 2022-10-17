@@ -1,4 +1,4 @@
-use crate::{errors::VMError, config::{CHIP8_TOTAL_STACK_DEPTH}};
+use crate::{errors::VMError, config::{CHIP8_TOTAL_STACK_DEPTH, CHIP8_MEM_SIZE}};
 
 #[derive(Default)]
 pub struct Registers {
@@ -57,7 +57,7 @@ impl Registers {
         self.st -= 1;
     }
 
-    fn validate_sp_in_bounds(&self) -> Result<(), VMError>{
+    fn validate_sp_in_bounds(&self) -> Result<(), VMError> {
         if (self.sp as usize) < CHIP8_TOTAL_STACK_DEPTH && self.sp >= 0 {
             return Ok(())
         } 
@@ -66,6 +66,18 @@ impl Registers {
 
     pub(crate) fn set_pc(&mut self, value: u16) {
         self.pc = value;
+    }
+
+    pub(crate) fn get_pc(&self) -> usize {
+        self.pc as usize
+    }
+
+    pub(crate) fn inc_pc(&mut self)  -> Result<(), VMError> {
+        if !(self.pc < CHIP8_MEM_SIZE as u16) {
+            return Err(VMError::ProgramCounterOverflow)
+        }
+        self.pc += 1;
+        Ok(())
     }
 
 }

@@ -20,6 +20,7 @@ impl Screen {
         Ok(())
     }
 
+    #[allow(unused)]
     pub(crate) fn unset_pixel(&mut self, x: usize, y: usize) -> Result<(), VMError> {
         if !self.check_bounds(x, y) {
             return Err(VMError::ScreenOutOfBounds(x, y))

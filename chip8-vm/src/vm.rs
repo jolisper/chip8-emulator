@@ -1,4 +1,4 @@
-use crate::{errors::VMError, memory::RAM, cpu::Registers, cpu::Stack, io::{Keyboard, Screen}, config::{CHIP8_PROGRAM_LOAD_ADDRESS, CHIP8_MEM_SIZE}};
+use crate::{errors::VMError, memory::RAM, cpu::Registers, cpu::Stack, io::{Keyboard, Screen}, config::CHIP8_PROGRAM_LOAD_ADDRESS};
 
 #[derive(Default)]
 pub struct VM {
@@ -26,6 +26,10 @@ impl VM {
     pub fn memory_get_ref(&mut self, index: usize) -> Result<&[u8], VMError> {
         let memref = self.memory.get_ref(index);
         Ok(memref)
+    }
+
+    pub fn memory_get_opcode(&self) -> Result<u16, VMError> {
+        self.memory.get_opcode(self.registers.get_pc())
     }
 
     pub fn stack_push(&mut self, value: u16) -> Result<(), VMError> {
@@ -96,6 +100,13 @@ impl VM {
     pub fn load_program(&mut self, buf: &[u8]) -> Result<(), VMError> {
         self.memory.load_program(buf)?;
         self.registers.set_pc(CHIP8_PROGRAM_LOAD_ADDRESS as u16);
+        Ok(())
+    }
+
+    pub fn exec(&mut self) -> Result<(), VMError> {
+        #[allow(unused)]
+        let opcode = self.memory.get_opcode(self.registers.get_pc())?;
+        self.registers.inc_pc()?;
         Ok(())
     }
 
