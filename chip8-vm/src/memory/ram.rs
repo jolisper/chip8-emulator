@@ -2,47 +2,40 @@ use std::io::Write;
 
 use crate::errors::VMError;
 
-use crate::{config::*};
+use crate::config::*;
 
-const CHARSET: &'static [u8] = &[ 
-    // 0 
-    0xf0, 0x90, 0x90, 0x90, 0xf0,
-    // 1
-    0x20, 0x60, 0x20, 0x20, 0x70,
-    // 2
-    0xf0, 0x10, 0xf0, 0x80, 0xf0,
-    // 3
-    0xf0, 0x10, 0xf0, 0x10, 0xf0,
-    // 4 
-    0x90, 0x90, 0xf0, 0x10, 0x10,
-    // 5 
-    0xf0, 0x80, 0xf0, 0x10, 0xf0,
-    // 6
-    0xf0, 0x80, 0xf0, 0x90, 0xf0,
-    // 7
-    0xf0, 0x10, 0x20, 0x40, 0x40,
-    // 8
-    0xf0, 0x90, 0xf0, 0x90, 0xf0,
-    // 9 
-    0xf0, 0x90, 0xf0, 0x10, 0xf0,
-    // A
-    0xf0, 0x90, 0xf0, 0x90, 0x90,
-    // B
-    0xe0, 0x90, 0xe0, 0x90, 0xe0,
-    // C
-    0xf0, 0x80, 0x80, 0x80, 0xf0,
-    // D
-    0xe0, 0x90, 0x90, 0x90, 0xe0,
-    // E
-    0xf0, 0x80, 0xf0, 0x80, 0xf0,
-    // F
+const CHARSET: &'static [u8] = &[
+    // 0
+    0xf0, 0x90, 0x90, 0x90, 0xf0, // 1
+    0x20, 0x60, 0x20, 0x20, 0x70, // 2
+    0xf0, 0x10, 0xf0, 0x80, 0xf0, // 3
+    0xf0, 0x10, 0xf0, 0x10, 0xf0, // 4
+    0x90, 0x90, 0xf0, 0x10, 0x10, // 5
+    0xf0, 0x80, 0xf0, 0x10, 0xf0, // 6
+    0xf0, 0x80, 0xf0, 0x90, 0xf0, // 7
+    0xf0, 0x10, 0x20, 0x40, 0x40, // 8
+    0xf0, 0x90, 0xf0, 0x90, 0xf0, // 9
+    0xf0, 0x90, 0xf0, 0x10, 0xf0, // A
+    0xf0, 0x90, 0xf0, 0x90, 0x90, // B
+    0xe0, 0x90, 0xe0, 0x90, 0xe0, // C
+    0xf0, 0x80, 0x80, 0x80, 0xf0, // D
+    0xe0, 0x90, 0x90, 0x90, 0xe0, // E
+    0xf0, 0x80, 0xf0, 0x80, 0xf0, // F
     0xf0, 0x80, 0xf0, 0x80, 0x80,
 ];
 
 const COLUMNS_PER_LINE: u32 = 8;
 
-macro_rules! memaddr_pattern {() => ("{:#06X} | ")}
-macro_rules! byte_pattern {() => ("{:#04X} ")}
+macro_rules! memaddr_pattern {
+    () => {
+        "{:#06X}: "
+    };
+}
+macro_rules! byte_pattern {
+    () => {
+        "{:#04X} "
+    };
+}
 
 pub struct RAM {
     memory: [u8; CHIP8_MEM_SIZE],
@@ -53,7 +46,7 @@ impl Default for RAM {
         let mut ram = Self {
             memory: [0x00; CHIP8_MEM_SIZE],
         };
-        // Set the default chatset at the beginning of reserved memory. 
+        // Set the default chatset at the beginning of reserved memory.
         ram.memory[..CHARSET.len()].copy_from_slice(CHARSET);
 
         ram
@@ -61,13 +54,12 @@ impl Default for RAM {
 }
 
 impl RAM {
-
     pub(crate) fn set(&mut self, index: usize, value: u8) -> Result<(), VMError> {
         if index > CHIP8_MEM_SIZE - 1 {
             return Err(VMError::MemoryOutOfBounds(index));
         }
         if index <= CHIP8_MEM_RESEVED_LIMIT {
-            return Err(VMError::ReservedMemoryWriteAttempt)
+            return Err(VMError::ReservedMemoryWriteAttempt);
         }
         self.memory[index] = value;
         Ok(())
@@ -87,9 +79,10 @@ impl RAM {
 
     pub(crate) fn load_program(&mut self, buffer: &[u8]) -> Result<(), VMError> {
         if !(buffer.len() + CHIP8_PROGRAM_LOAD_ADDRESS < CHIP8_MEM_SIZE) {
-            return Err(VMError::ProgramSizeOverflow)
+            return Err(VMError::ProgramSizeOverflow);
         }
-        self.memory[CHIP8_PROGRAM_LOAD_ADDRESS..CHIP8_PROGRAM_LOAD_ADDRESS+buffer.len()].copy_from_slice(buffer);
+        self.memory[CHIP8_PROGRAM_LOAD_ADDRESS..CHIP8_PROGRAM_LOAD_ADDRESS + buffer.len()]
+            .copy_from_slice(buffer);
         Ok(())
     }
 
@@ -101,18 +94,28 @@ impl RAM {
         Ok(instruction)
     }
 
+    pub(crate) fn get_ram(&self) -> [u8; CHIP8_MEM_SIZE] {
+        self.memory
+    }
+
     pub(crate) fn dump(&self) {
         let mut colums_count = 1;
-        print!(memaddr_pattern!(), 0); 
+        print!(memaddr_pattern!(), 0);
         for (memaddr, byte) in self.memory.iter().enumerate() {
             if colums_count > COLUMNS_PER_LINE {
                 colums_count = 1;
                 println!();
-                print!(memaddr_pattern!(), memaddr); 
+                print!(memaddr_pattern!(), memaddr);
             }
             print!(byte_pattern!(), byte);
             colums_count += 1;
         }
+        println!();
         std::io::stdout().flush().unwrap();
+    }
+
+    pub(crate) fn read(&self, from: usize, bytes_rd: usize) -> Vec<u8> {
+        let to = from + bytes_rd;
+        self.memory[from..to].to_vec()
     }
 }

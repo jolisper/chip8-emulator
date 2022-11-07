@@ -5,3 +5,4 @@ pub(crate) const CHIP8_PROGRAM_LOAD_ADDRESS: usize = 0x200;
 pub(crate) const CHIP8_TOTAL_KEYS: usize = 16;
 pub(crate) const CHIP8_SCREEN_WIDTH: usize = 64;
 pub(crate) const CHIP8_SCREEN_HEIGHT: usize = 32;
+pub(crate) const CHIP8_TOTAL_STANDARD_OPCODES: usize = 35;

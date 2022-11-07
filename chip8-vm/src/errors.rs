@@ -11,6 +11,8 @@ pub enum VMError {
     ScreenOutOfBounds(usize, usize),
     ProgramSizeOverflow,
     ProgramCounterOverflow,
+    ProgramCounterUnderflow,
+    InvalidOpcode(u16),
 }
 
 impl Error for VMError {}
@@ -20,7 +22,7 @@ impl fmt::Display for VMError {
         match *self {
             VMError::MemoryOutOfBounds(index) => {
                 write!(f, "invalid memory index: {}", index)
-            },
+            }
             VMError::StackOutOfBounds(sp) => {
                 write!(f, "invalid stack index: {}", sp)
             }
@@ -32,22 +34,28 @@ impl fmt::Display for VMError {
             }
             VMError::ReservedMemoryWriteAttempt => {
                 write!(f, "reserved memory write attempt (0x000 to 0x1FF)")
-            },
+            }
             VMError::ScreenOutOfBounds(x, y) => {
                 write!(f, "screen pixel set/unset out of bounds: x={} y={}", x, y)
-            },
+            }
             VMError::ProgramSizeOverflow => {
                 write!(f, "the program size si to big to be loaded in memmory")
-            },
+            }
             VMError::ProgramCounterOverflow => {
                 write!(f, "the PC register overflow")
-            },
+            }
+            VMError::ProgramCounterUnderflow => {
+                write!(f, "the PC register underflow")
+            }
+            VMError::InvalidOpcode(binary_opcode) => {
+                write!(f, "invalid opcode instruction: {:#02X}", binary_opcode)
+            }
         }
     }
 }
 
 impl From<VMError> for String {
     fn from(vmerr: VMError) -> Self {
-       vmerr.to_string() 
+        vmerr.to_string()
     }
 }

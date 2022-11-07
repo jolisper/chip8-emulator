@@ -1,7 +1,7 @@
 use sdl2::{self, sys::SDL_KeyCode};
 
 pub static KEYMAP: &'static [i32] = &[
-    SDL_KeyCode::SDLK_0 as i32, 
+    SDL_KeyCode::SDLK_0 as i32,
     SDL_KeyCode::SDLK_1 as i32,
     SDL_KeyCode::SDLK_2 as i32,
     SDL_KeyCode::SDLK_3 as i32,

@@ -1,4 +1,4 @@
-use crate::{memory::ROM::KEYMAP, errors::VMError, config::CHIP8_TOTAL_KEYS};
+use crate::{config::CHIP8_TOTAL_KEYS, errors::VMError, memory::ROM::KEYMAP};
 
 pub struct Keyboard {
     keyboard: [bool; CHIP8_TOTAL_KEYS],
@@ -13,7 +13,6 @@ impl Default for Keyboard {
 }
 
 impl Keyboard {
-
     pub(crate) fn key_down(&mut self, key: i32) {
         self.map_to_vkey(key)
             .map(|key| self.keyboard[key as usize] = true)
@@ -26,8 +25,12 @@ impl Keyboard {
             .ok();
     }
 
-    pub(crate) fn is_key_down(&self, vkey: u32) -> bool {
+    pub(crate) fn is_key_down(&self, vkey: u8) -> bool {
         self.keyboard[vkey as usize]
+    }
+
+    pub(crate) fn is_key_up(&self, vkey: u8) -> bool {
+        !self.keyboard[vkey as usize]
     }
 
     pub(crate) fn map_to_vkey(&self, key: i32) -> Result<usize, VMError> {
