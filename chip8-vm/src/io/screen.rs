@@ -18,14 +18,6 @@ impl Default for Screen {
     }
 }
 
-macro_rules! memaddr_pattern {
-    () => {
-        "{:#06X} | "
-    };
-}
-
-const COLUMNS_PER_LINE: u32 = 8;
-
 impl Screen {
     pub(crate) fn set_pixel(&mut self, x: usize, y: usize) -> Result<(), VMError> {
         if !self.check_bounds(x, y) {

@@ -603,7 +603,7 @@ fn add_vx_kk(
     let vx_index = ((opcode & 0x0F00) >> 8) as usize;
     let vx_value = registers.get_v_register(vx_index);
     let kk_value = (opcode & 0x00FF) as u8;
-    registers.set_v_register(vx_index, vx_value + kk_value);
+    registers.set_v_register(vx_index, vx_value.wrapping_add(kk_value));
     registers.inc_pc()?;
     Ok(())
 }

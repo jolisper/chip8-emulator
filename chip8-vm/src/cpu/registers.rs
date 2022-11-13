@@ -84,14 +84,6 @@ impl Registers {
         Ok(())
     }
 
-    pub(crate) fn dec_pc(&mut self) -> Result<(), VMError> {
-        if self.pc < 2 {
-            return Err(VMError::ProgramCounterUnderflow);
-        }
-        self.pc -= 2;
-        return Ok(());
-    }
-
     pub(crate) fn set_v_register(&mut self, index: usize, value: u8) {
         (*self.v_registers_mut()[index]) = value;
     }
@@ -138,10 +130,6 @@ impl Registers {
         self.v_f = 0;
     }
 
-    pub(crate) fn get_vf(&self) -> u8 {
-        self.v_f
-    }
-
     pub(crate) fn set_i(&mut self, value: u16) {
         self.i = value;
     }
@@ -164,10 +152,6 @@ impl Registers {
 
     pub(crate) fn set_st(&mut self, value: u8) {
         self.st = value;
-    }
-
-    pub(crate) fn get_st(&self) -> u8 {
-        self.st
     }
 
     pub(crate) fn dump(&self) {

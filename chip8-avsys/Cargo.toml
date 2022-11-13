@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sdl2 = { version = "0.35", features = ['bundled'] }
+sdl2 = { version = "0.35", features = ["bundled"] }
 chip8-vm = { path = "../chip8-vm" }
+clap = { version = "3.1.6", features = ["derive"] }

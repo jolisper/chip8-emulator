@@ -2,13 +2,15 @@ mod config;
 
 extern crate sdl2;
 
+use clap::Parser;
 use sdl2::audio::{AudioCallback, AudioSpec, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
+use sdl2::render::Canvas;
+use sdl2::video::Window;
 use sdl2::AudioSubsystem;
-use std::env;
 use std::io::Read;
 use std::time::Duration;
 
@@ -37,21 +39,24 @@ impl AudioCallback for SquareWave {
     }
 }
 
-#[allow(unused)]
+#[derive(Parser)]
+struct Args {
+    rom_file: String,
+    debug: bool,
+}
+
 pub fn main() -> Result<(), String> {
-    let args: Vec<String> = env::args().collect();
-    let rom_file_name = &args[1];
+    let args = Args::parse();
+    let rom_file_name = args.rom_file;
+    let debug_mode = args.debug;
 
     // Load ROM file
     let mut file = std::fs::File::open(rom_file_name).unwrap();
     let mut buf = Vec::new();
-    file.read_to_end(&mut buf);
+    file.read_to_end(&mut buf).expect("read all ROM file");
 
     let mut chip8: VM = VM::new();
-    chip8.load_program(&buf);
-
-    // Init testing
-    // general_test(&mut chip8);
+    chip8.load_program(&buf)?;
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video()?;
@@ -76,18 +81,7 @@ pub fn main() -> Result<(), String> {
         canvas.clear();
         canvas.set_draw_color(Color::RGB(255, 204, 0));
 
-        for x in 0..CHIP8_WIDTH {
-            for y in 0..CHIP8_HEIGHT {
-                if chip8.screen_is_pixel_set(x as usize, y as usize)? {
-                    canvas.fill_rect(Rect::new(
-                        (x * CHIP8_WINDOW_MULTIPLIER) as i32,
-                        (y * CHIP8_WINDOW_MULTIPLIER) as i32,
-                        CHIP8_WINDOW_MULTIPLIER,
-                        CHIP8_WINDOW_MULTIPLIER,
-                    ))?;
-                }
-            }
-        }
+        draw_pixels(&mut chip8, &mut canvas)?;
 
         canvas.present();
 
@@ -113,7 +107,7 @@ pub fn main() -> Result<(), String> {
         }
 
         if chip8.registers_dt() > 0 {
-            std::thread::sleep(Duration::from_millis(50));
+            std::thread::sleep(Duration::from_millis(10));
             chip8.registers_dec_dt();
         }
 
@@ -124,10 +118,9 @@ pub fn main() -> Result<(), String> {
             device.pause();
         }
 
-        chip8.exec_next_opcode(false)?;
+        chip8.exec_next_opcode(debug_mode)?;
 
-        // ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 10000));
-        // The rest of the game loop goes here...
+        ::std::thread::sleep(::std::time::Duration::new(0, 1_000_000_000u32 / 1000));
     }
 
     Ok(())
@@ -149,42 +142,18 @@ fn build_audio_device(audio_subsystem: &AudioSubsystem) -> sdl2::audio::AudioDev
         .unwrap()
 }
 
-#[allow(unused)]
-fn general_test(chip8: &mut VM) {
-    chip8.screen_draw_sprite(00, 0, 0x00, 5);
-    chip8.screen_draw_sprite(05, 0, 0x05, 5);
-    chip8.screen_draw_sprite(10, 0, 0x0a, 5);
-    chip8.screen_draw_sprite(15, 0, 0x0f, 5);
-    chip8.screen_draw_sprite(20, 0, 0x14, 5);
-    chip8.screen_draw_sprite(25, 0, 0x19, 5);
-    chip8.screen_draw_sprite(30, 0, 0x1e, 5);
-    chip8.screen_draw_sprite(35, 0, 0x23, 5);
-    chip8.screen_draw_sprite(40, 0, 0x28, 5);
-    chip8.screen_draw_sprite(45, 0, 0x2d, 5);
-    chip8.screen_draw_sprite(50, 0, 0x32, 5);
-    chip8.screen_draw_sprite(55, 0, 0x37, 5);
-    chip8.screen_draw_sprite(60, 0, 0x3c, 5);
-    chip8.screen_draw_sprite(00, 6, 0x41, 5);
-    chip8.screen_draw_sprite(05, 6, 0x46, 5);
-    chip8.screen_draw_sprite(10, 6, 0x4b, 5);
-
-    // Wrapped print of "A" sprint
-    chip8.screen_draw_sprite(62, 12, 0x32, 5);
-
-    // Print same sprite in the same position twice, check collision:
-    chip8.screen_draw_sprite(32, 16, 0x32, 5);
-    if !chip8.screen_draw_sprite(32, 16, 0x32, 5).unwrap() {
-        panic!("Collision must be detected")
+fn draw_pixels(chip8: &mut VM, canvas: &mut Canvas<Window>) -> Result<(), String> {
+    for x in 0..CHIP8_WIDTH {
+        for y in 0..CHIP8_HEIGHT {
+            if chip8.screen_is_pixel_set(x as usize, y as usize)? {
+                canvas.fill_rect(Rect::new(
+                    (x * CHIP8_WINDOW_MULTIPLIER) as i32,
+                    (y * CHIP8_WINDOW_MULTIPLIER) as i32,
+                    CHIP8_WINDOW_MULTIPLIER,
+                    CHIP8_WINDOW_MULTIPLIER,
+                ))?;
+            }
+        }
     }
-
-    // Check on/off pixel behavior when is set again
-    if chip8.screen_is_pixel_set(60, 16).unwrap() {
-        panic!("The pixel must be unset")
-    }
-
-    // Set delay timer
-    chip8.registers_set_dt(255);
-
-    // Set sound timer
-    //chip8.registers_set_st(20);
+    Ok(())
 }

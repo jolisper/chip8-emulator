@@ -94,10 +94,6 @@ impl RAM {
         Ok(instruction)
     }
 
-    pub(crate) fn get_ram(&self) -> [u8; CHIP8_MEM_SIZE] {
-        self.memory
-    }
-
     pub(crate) fn dump(&self) {
         let mut colums_count = 1;
         print!(memaddr_pattern!(), 0);
@@ -112,10 +108,5 @@ impl RAM {
         }
         println!();
         std::io::stdout().flush().unwrap();
-    }
-
-    pub(crate) fn read(&self, from: usize, bytes_rd: usize) -> Vec<u8> {
-        let to = from + bytes_rd;
-        self.memory[from..to].to_vec()
     }
 }

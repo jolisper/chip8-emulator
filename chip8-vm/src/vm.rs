@@ -118,7 +118,6 @@ impl VM {
     pub fn load_program(&mut self, buf: &[u8]) -> Result<(), VMError> {
         self.memory.load_program(buf)?;
         self.registers.set_pc(CHIP8_PROGRAM_LOAD_ADDRESS as u16);
-        self.registers.dump();
         Ok(())
     }
 
@@ -170,10 +169,8 @@ impl VM {
 
 #[cfg(test)]
 mod tests {
-    use sdl2::sys::SDL_KeyCode;
-    use std::io::Read;
-
     use crate::VM;
+    use sdl2::sys::SDL_KeyCode;
 
     #[test]
     fn call_ret() {
@@ -194,7 +191,9 @@ mod tests {
         assert_eq!(chip8.registers.get_pc(), 0x0300);
 
         // Return
-        chip8.exec_opcode(0x00EE, false).expect("Return from subroutine");
+        chip8
+            .exec_opcode(0x00EE, false)
+            .expect("Return from subroutine");
         assert_eq!(chip8.registers.get_pc(), 0x0202);
         assert_eq!(chip8.registers.get_sp(), 0x0000);
     }
@@ -215,7 +214,9 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 0x001);
 
-        chip8.exec_opcode(0x3001, false).expect("Skip next instruction");
+        chip8
+            .exec_opcode(0x3001, false)
+            .expect("Skip next instruction");
 
         assert_eq!(chip8.registers.get_pc(), 0x0204);
     }
@@ -444,7 +445,9 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.exec_opcode(0x60ff, false).expect("Set V0 to 255");
         chip8.exec_opcode(0x61ee, false).expect("Set V1 t0 255");
-        chip8.exec_opcode(0x9010, false).expect("Skip next instruction");
+        chip8
+            .exec_opcode(0x9010, false)
+            .expect("Skip next instruction");
 
         assert_eq!(chip8.registers.get_pc(), 0x0208);
     }
@@ -455,7 +458,9 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.exec_opcode(0x60FF, false).expect("Set V0 to 255");
         chip8.exec_opcode(0x61FF, false).expect("Set V1 t0 255");
-        chip8.exec_opcode(0x9010, false).expect("Skip next instruction");
+        chip8
+            .exec_opcode(0x9010, false)
+            .expect("Skip next instruction");
 
         assert_eq!(chip8.registers.get_pc(), 0x0206);
     }
@@ -475,7 +480,9 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.exec_opcode(0x6002, false).expect("Set V0 to 002");
-        chip8.exec_opcode(0xB300, false).expect("Set PC to V0 + 002");
+        chip8
+            .exec_opcode(0xB300, false)
+            .expect("Set PC to V0 + 002");
 
         assert_eq!(chip8.registers.get_pc(), 0x0302);
     }
@@ -486,12 +493,14 @@ mod tests {
         chip8.registers.set_pc(0x0200);
 
         // No collision, yet
-        assert_eq!(chip8.registers.get_vf(), 0);
+        assert_eq!(chip8.registers.get_v_register(0xF), 0);
 
         chip8.exec_opcode(0xA000, false).expect("Set I to 00");
         chip8.exec_opcode(0x600A, false).expect("Set V0 to 10");
         chip8.exec_opcode(0x610A, false).expect("Set V1 to 10");
-        chip8.exec_opcode(0xD015, false).expect("Draw 5 bytes sprite");
+        chip8
+            .exec_opcode(0xD015, false)
+            .expect("Draw 5 bytes sprite");
 
         // Expect that '0' is printed in screen at (10, 10)
         assert_eq!(chip8.screen.is_pixel_set(10, 10).unwrap(), true);
@@ -522,38 +531,48 @@ mod tests {
 
         chip8.exec_opcode(0x600D, false).expect("Set V0 to 13");
         chip8.exec_opcode(0x610E, false).expect("Set V1 to 14");
-        chip8.exec_opcode(0xD015, false).expect("Draw 5 bytes sprite");
+        chip8
+            .exec_opcode(0xD015, false)
+            .expect("Draw 5 bytes sprite");
         // Collision!
-        assert_eq!(chip8.registers.get_vf(), 1);
+        assert_eq!(chip8.registers.get_v_register(0xF), 1);
 
         assert_eq!(chip8.registers.get_pc(), 0x020E);
 
         chip8.exec_opcode(0x600A, false).expect("Set V0 to 10");
         chip8.exec_opcode(0x6112, false).expect("Set V1 to 18");
-        chip8.exec_opcode(0xD015, false).expect("Draw 5 bytes sprite");
+        chip8
+            .exec_opcode(0xD015, false)
+            .expect("Draw 5 bytes sprite");
         // Collision!
-        assert_eq!(chip8.registers.get_vf(), 1);
+        assert_eq!(chip8.registers.get_v_register(0xF), 1);
 
         assert_eq!(chip8.registers.get_pc(), 0x0214);
 
         chip8.exec_opcode(0x6010, false).expect("Set V0 to 16");
         chip8.exec_opcode(0x610A, false).expect("Set V1 to 10");
-        chip8.exec_opcode(0xD015, false).expect("Draw 5 bytes sprite");
+        chip8
+            .exec_opcode(0xD015, false)
+            .expect("Draw 5 bytes sprite");
         // Collision!
-        assert_eq!(chip8.registers.get_vf(), 1);
+        assert_eq!(chip8.registers.get_v_register(0xF), 1);
 
         chip8.exec_opcode(0x6010, false).expect("Set V0 to 16");
         chip8.exec_opcode(0x6112, false).expect("Set V1 to 18");
-        chip8.exec_opcode(0xD015, false).expect("Draw 5 bytes sprite");
+        chip8
+            .exec_opcode(0xD015, false)
+            .expect("Draw 5 bytes sprite");
         // Collision!
-        assert_eq!(chip8.registers.get_vf(), 1);
+        assert_eq!(chip8.registers.get_v_register(0xF), 1);
 
         chip8.exec_opcode(0x6014, false).expect("Set V0 to 13");
         chip8.exec_opcode(0x610E, false).expect("Set V1 to 14");
-        chip8.exec_opcode(0xD015, false).expect("Draw 5 bytes sprite");
+        chip8
+            .exec_opcode(0xD015, false)
+            .expect("Draw 5 bytes sprite");
 
         // Collision!
-        assert_eq!(chip8.registers.get_vf(), 0);
+        assert_eq!(chip8.registers.get_v_register(0xF), 0);
     }
 
     #[test]
@@ -561,9 +580,13 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.keyboard_key_down(SDL_KeyCode::SDLK_a as i32); // User press 'A' key
-        chip8.exec_opcode(0x600A, false).expect("Set V0 to match A key");
+        chip8
+            .exec_opcode(0x600A, false)
+            .expect("Set V0 to match A key");
         assert_eq!(chip8.registers.get_v_register(0), 0xA);
-        chip8.exec_opcode(0xE09E, false).expect("Skip next instruction");
+        chip8
+            .exec_opcode(0xE09E, false)
+            .expect("Skip next instruction");
         assert_eq!(chip8.registers.get_pc(), 0x0206);
     }
 
@@ -572,7 +595,9 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.keyboard_key_up(SDL_KeyCode::SDLK_a as i32); // User release 'A' key
-        chip8.exec_opcode(0x600A, false).expect("Set V0 to match A key");
+        chip8
+            .exec_opcode(0x600A, false)
+            .expect("Set V0 to match A key");
         chip8
             .exec_opcode(0xE09E, false)
             .expect("Not skip next instruction");
@@ -606,7 +631,9 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 10);
-        chip8.exec_opcode(0xF015, false).expect("Set delay timer to Vx");
+        chip8
+            .exec_opcode(0xF015, false)
+            .expect("Set delay timer to Vx");
         assert_eq!(chip8.registers.get_dt(), 0x0A);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
     }
@@ -616,8 +643,10 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 10);
-        chip8.exec_opcode(0xF018, false).expect("Set sound timer to Vx");
-        assert_eq!(chip8.registers.get_st(), 0x0A);
+        chip8
+            .exec_opcode(0xF018, false)
+            .expect("Set sound timer to Vx");
+        assert_eq!(chip8.registers.st, 0x0A);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
     }
 
@@ -627,7 +656,9 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 10);
         chip8.registers.set_i(10);
-        chip8.exec_opcode(0xF01E, false).expect("Set I = I + V0 = 20");
+        chip8
+            .exec_opcode(0xF01E, false)
+            .expect("Set I = I + V0 = 20");
         assert_eq!(chip8.registers.get_i(), 0x14);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
     }
@@ -803,198 +834,5 @@ mod tests {
         assert_eq!(chip8.registers.get_v_register(0xF), 0x00F);
 
         assert_eq!(chip8.registers.get_pc(), 0x0202);
-    }
-
-    #[test]
-    fn kaleid() {
-        let mut chip8: VM = VM::new();
-
-        let mut file = std::fs::File::open("../c8games/KALEID").unwrap();
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf).unwrap();
-
-        chip8.load_program(&buf).unwrap();
-
-        // chip8.exec_opcode(0x6000).unwrap();
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6000);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0), 0x00);
-        assert_eq!(chip8.registers.get_pc(), 0x0202);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6380);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(3), 0x80);
-        assert_eq!(chip8.registers.get_pc(), 0x0204);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x611F);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(1), 0x1F);
-        assert_eq!(chip8.registers.get_pc(), 0x0206);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x620F);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(2), 0x0F);
-        assert_eq!(chip8.registers.get_pc(), 0x0208);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x2232);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_sp(), 0x0001);
-        assert_eq!(chip8.stack.get_at(0).unwrap(), 0x0208);
-        assert_eq!(chip8.registers.get_pc(), 0x0232);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x4002);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x0236);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x4004);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x023A);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x4006);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x023E);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x4008);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x0242);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0xA277);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_i(), 0x0277);
-        assert_eq!(chip8.registers.get_pc(), 0x0244);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6AE0);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(10), 0xE0);
-        assert_eq!(chip8.registers.get_pc(), 0x0246);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x8A12);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0x0A), 0x00);
-        assert_eq!(chip8.registers.get_pc(), 0x0248);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6B1F);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(11), 0x1F);
-        assert_eq!(chip8.registers.get_pc(), 0x024A);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x81B2);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(1), 0x1F);
-        assert_eq!(chip8.registers.get_pc(), 0x024C);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x3A00);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(10), 0x00);
-        assert_eq!(chip8.registers.get_pc(), 0x0250);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6AF0);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(10), 0xF0);
-        assert_eq!(chip8.registers.get_pc(), 0x0252);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x8A22);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(10), 0x00);
-        assert_eq!(chip8.registers.get_pc(), 0x0254);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6B0F);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(11), 0x0F);
-        assert_eq!(chip8.registers.get_pc(), 0x0256);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x82B2);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0x02), 0x0F);
-        assert_eq!(chip8.registers.get_pc(), 0x0258);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x3A00);
-        // println!("Vx {:#010b}", chip8.registers.get_v_register(0x0A));
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(10), 0x00);
-        assert_eq!(chip8.registers.get_pc(), 0x025C);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6B1F);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(11), 0x1F);
-        assert_eq!(chip8.registers.get_pc(), 0x025E);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x81B2);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0x2), 0x0F);
-        assert_eq!(chip8.registers.get_pc(), 0x0260);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0xD121);
-        // println!("I  {:#06X}", chip8.registers.get_i());
-        // println!("Vx {}", chip8.registers.get_v_register(0x1));
-        // println!("Vy {}", chip8.registers.get_v_register(0xB));
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x0262);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x8A10);
-        // println!("Vx {}", chip8.registers.get_v_register(0xA));
-        // println!("Vy {}", chip8.registers.get_v_register(0x1));
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0xA), 31);
-        assert_eq!(chip8.registers.get_pc(), 0x0264);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6B1F);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0xA), 31);
-        assert_eq!(chip8.registers.get_pc(), 0x0266);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x8B25);
-        // println!("Vx {}", chip8.registers.get_v_register(0xB));
-        // println!("Vy {}", chip8.registers.get_v_register(0x2));
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0xB), 16);
-        assert_eq!(chip8.registers.get_vf(), 1);
-        assert_eq!(chip8.registers.get_pc(), 0x0268);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0xDAB1);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x026A);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x6A3F);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0xA), 0x3F);
-        assert_eq!(chip8.registers.get_pc(), 0x026C);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x8A15);
-        // println!("Vx {}", chip8.registers.get_v_register(0xA));
-        // println!("Vy {}", chip8.registers.get_v_register(0x1));
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0xA), 32);
-        assert_eq!(chip8.registers.get_vf(), 1);
-        assert_eq!(chip8.registers.get_pc(), 0x026E);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0xDAB1);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x0270);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x8B20);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_v_register(0xB), 15);
-        assert_eq!(chip8.registers.get_pc(), 0x0272);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0xDAB1);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x0274);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x00EE);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_sp(), 0x00);
-        assert_eq!(chip8.registers.get_pc(), 0x0208);
-
-        // Loop
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x2232);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_sp(), 0x0001);
-        assert_eq!(chip8.stack.get_at(0).unwrap(), 0x0208);
-        assert_eq!(chip8.registers.get_pc(), 0x0232);
-
-        assert_eq!(chip8.memory_get_opcode().unwrap(), 0x4002);
-        chip8.exec_next_opcode(false).unwrap();
-        assert_eq!(chip8.registers.get_pc(), 0x0236);
     }
 }
