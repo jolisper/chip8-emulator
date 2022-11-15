@@ -34,9 +34,9 @@ impl Keyboard {
     }
 
     pub(crate) fn map_to_vkey(&self, key: i32) -> Result<usize, VMError> {
-        for (i, k) in KEYMAP.into_iter().enumerate() {
-            if key == *k {
-                return Ok(i);
+        for (sdl_k, ch8_k) in KEYMAP.into_iter() {
+            if key == *sdl_k {
+                return Ok(*ch8_k);
             }
         }
         Err(VMError::KeyMapNotFound)
