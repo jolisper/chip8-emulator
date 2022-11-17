@@ -50,20 +50,24 @@ impl VM {
         Ok(value)
     }
 
-    pub fn keyboard_key_down(&mut self, key: i32) {
-        self.keyboard.key_down(key)
+    pub fn keyboard_key_down(&mut self, key: i32, keymap: &[(i32, usize)]) {
+        self.keyboard.key_down(key, keymap)
     }
 
-    pub fn keyboard_key_up(&mut self, key: i32) {
-        self.keyboard.key_up(key)
+    pub fn keyboard_key_up(&mut self, key: i32, keymap: &[(i32, usize)]) {
+        self.keyboard.key_up(key, keymap)
     }
 
     pub fn keyboard_is_key_down(&mut self, key: u8) -> bool {
         self.keyboard.is_key_down(key)
     }
 
-    pub fn keyboard_map_to_vkey(&mut self, key: i32) -> Result<usize, VMError> {
-        self.keyboard.map_to_vkey(key)
+    pub fn keyboard_map_to_vkey(
+        &mut self,
+        key: i32,
+        keymap: &[(i32, usize)],
+    ) -> Result<usize, VMError> {
+        self.keyboard.map_to_vkey(key, keymap)
     }
 
     pub fn screen_is_pixel_set(&mut self, x: usize, y: usize) -> Result<bool, VMError> {
@@ -170,7 +174,6 @@ impl VM {
 #[cfg(test)]
 mod tests {
     use crate::VM;
-    use sdl2::sys::SDL_KeyCode;
 
     #[test]
     fn call_ret() {
@@ -575,15 +578,34 @@ mod tests {
         assert_eq!(chip8.registers.get_v_register(0xF), 0);
     }
 
+    static KEYMAP: &'static [(i32, usize)] = &[
+        (49, 0x1),
+        (50, 0x2),
+        (51, 0x3),
+        (52, 0xC),
+        (113, 0x4),
+        (119, 0x5),
+        (101, 0x6),
+        (114, 0xD),
+        (97, 0x7),
+        (115, 0x8),
+        (100, 0x9),
+        (102, 0xE),
+        (122, 0xA),
+        (120, 0x0),
+        (99, 0xB),
+        (118, 0xF),
+    ];
+
     #[test]
     fn skp_vx_key_down() {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
-        chip8.keyboard_key_down(SDL_KeyCode::SDLK_a as i32); // User press 'A' key
+        chip8.keyboard_key_down(97, KEYMAP); // User press 'A' key
         chip8
-            .exec_opcode(0x600A, false)
+            .exec_opcode(0x6007, false)
             .expect("Set V0 to match A key");
-        assert_eq!(chip8.registers.get_v_register(0), 0xA);
+        assert_eq!(chip8.registers.get_v_register(0), 0x7);
         chip8
             .exec_opcode(0xE09E, false)
             .expect("Skip next instruction");
@@ -594,7 +616,7 @@ mod tests {
     fn skp_vx_key_up() {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
-        chip8.keyboard_key_up(SDL_KeyCode::SDLK_a as i32); // User release 'A' key
+        chip8.keyboard_key_up(97, KEYMAP); // User release 'A' key
         chip8
             .exec_opcode(0x600A, false)
             .expect("Set V0 to match A key");
@@ -620,9 +642,9 @@ mod tests {
     fn ld_vx_k() {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
-        chip8.keyboard_key_down(SDL_KeyCode::SDLK_a as i32);
+        chip8.keyboard_key_down(97, KEYMAP);
         chip8.exec_opcode(0xF00A, false).expect("Set V0 to 0xA key");
-        assert_eq!(chip8.registers.get_v_register(0), 0x0A);
+        assert_eq!(chip8.registers.get_v_register(0), 0x7);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
     }
 
