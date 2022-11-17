@@ -639,6 +639,7 @@ fn or_vx_vy(
     let vx_value = registers.get_v_register(vx_index);
     let vy_value = registers.get_v_register(vy_index);
     registers.set_v_register(vx_index, vx_value | vy_value);
+    registers.unset_vf();
     registers.inc_pc()?;
     Ok(())
 }
@@ -657,6 +658,7 @@ fn and_vx_vy(
     let vx_value = registers.get_v_register(vx_index);
     let vy_value = registers.get_v_register(vy_index);
     registers.set_v_register(vx_index, vx_value & vy_value);
+    registers.unset_vf();
     registers.inc_pc()?;
     Ok(())
 }
@@ -675,6 +677,7 @@ fn xor_vx_vy(
     let vx_value = registers.get_v_register(vx_index);
     let vy_value = registers.get_v_register(vy_index);
     registers.set_v_register(vx_index, vx_value ^ vy_value);
+    registers.unset_vf();
     registers.inc_pc()?;
     Ok(())
 }
