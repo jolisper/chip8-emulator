@@ -737,11 +737,11 @@ fn shr_vx(
     let vx_index = ((opcode & 0x0F00) >> 8) as usize;
     let vx_value = registers.get_v_register(vx_index);
     let vx_lsb = vx_value & 0b0000_0001;
+    registers.set_v_register(vx_index, vx_value >> 1);
     registers.unset_vf();
     if vx_lsb == 1 {
         registers.set_vf();
-    }
-    registers.set_v_register(vx_index, vx_value.wrapping_div(2));
+    }     
     registers.inc_pc()?;
     Ok(())
 }
@@ -780,11 +780,11 @@ fn shl_vx(
     let vx_index = ((opcode & 0x0F00) >> 8) as usize;
     let vx_value = registers.get_v_register(vx_index);
     let vx_msb = vx_value & 0b1000_0000;
+    registers.set_v_register(vx_index, vx_value << 1);
     registers.unset_vf();
     if vx_msb > 0 {
         registers.set_vf();
     }
-    registers.set_v_register(vx_index, vx_value.wrapping_mul(2));
     registers.inc_pc()?;
     Ok(())
 }
