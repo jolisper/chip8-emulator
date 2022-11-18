@@ -138,6 +138,10 @@ impl Registers {
         self.i
     }
 
+    pub(crate) fn inc_i(&mut self) {
+        self.i += 1;
+    }
+
     pub(crate) fn get_dt(&self) -> u8 {
         self.dt
     }

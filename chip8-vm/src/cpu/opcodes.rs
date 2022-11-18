@@ -744,7 +744,7 @@ fn shr_vx(
     registers.unset_vf();
     if vx_lsb == 1 {
         registers.set_vf();
-    }     
+    }
     registers.inc_pc()?;
     Ok(())
 }
@@ -1107,7 +1107,9 @@ fn ld_i_vx(
 
     for vx in 0..=vx_index {
         memory.set(base_addr + vx, registers.get_v_register(vx))?;
+        registers.inc_i();
     }
+    registers.inc_i();
 
     registers.inc_pc()?;
     Ok(())
@@ -1128,7 +1130,9 @@ fn ld_vx_i(
     for vx in 0..=vx_index {
         let value = memory.get(base_addr + vx)?;
         registers.set_v_register(vx, value);
+        registers.inc_i();
     }
+    registers.inc_i();
 
     registers.inc_pc()?;
     Ok(())
