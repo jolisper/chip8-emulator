@@ -5,4 +5,5 @@ mod io;
 mod memory;
 mod vm;
 
+pub use vm::Signal;
 pub use vm::VM;

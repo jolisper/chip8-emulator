@@ -16,7 +16,7 @@ use std::io::Read;
 use std::time::Duration;
 
 use crate::config::*;
-use chip8_vm::VM;
+use chip8_vm::{Signal, VM};
 
 pub static KEYMAP: &'static [(i32, usize)] = &[
     (SDL_KeyCode::SDLK_1 as i32, 0x1),
@@ -97,14 +97,6 @@ pub fn main() -> Result<(), String> {
     let mut event_pump = sdl_context.event_pump()?;
 
     'running: loop {
-        canvas.set_draw_color(Color::RGB(153, 102, 0));
-        canvas.clear();
-        canvas.set_draw_color(Color::RGB(255, 204, 0));
-
-        draw_pixels(&mut chip8, &mut canvas)?;
-
-        canvas.present();
-
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
@@ -138,9 +130,12 @@ pub fn main() -> Result<(), String> {
             device.pause();
         }
 
-        chip8.exec_next_opcode(debug_mode)?;
-
-        ::std::thread::sleep(::std::time::Duration::new(0, 1_000_000_000u32 / 1000));
+        match chip8.exec_next_opcode(debug_mode)? {
+            Signal::DrawScreen => {
+                draw_screen(&mut chip8, &mut canvas)?;
+            }
+            _ => {}
+        }
     }
 
     Ok(())
@@ -162,7 +157,10 @@ fn build_audio_device(audio_subsystem: &AudioSubsystem) -> sdl2::audio::AudioDev
         .unwrap()
 }
 
-fn draw_pixels(chip8: &mut VM, canvas: &mut Canvas<Window>) -> Result<(), String> {
+fn draw_screen(chip8: &mut VM, canvas: &mut Canvas<Window>) -> Result<(), String> {
+    canvas.set_draw_color(Color::RGB(153, 102, 0));
+    canvas.clear();
+    canvas.set_draw_color(Color::RGB(255, 204, 0));
     for x in 0..CHIP8_WIDTH {
         for y in 0..CHIP8_HEIGHT {
             if chip8.screen_is_pixel_set(x as usize, y as usize)? {
@@ -175,5 +173,6 @@ fn draw_pixels(chip8: &mut VM, canvas: &mut Canvas<Window>) -> Result<(), String
             }
         }
     }
+    canvas.present();
     Ok(())
 }

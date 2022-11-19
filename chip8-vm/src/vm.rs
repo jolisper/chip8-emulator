@@ -1,11 +1,12 @@
 use crate::{
     config::CHIP8_PROGRAM_LOAD_ADDRESS,
-    cpu::Stack,
-    cpu::{Registers, OPCODES},
+    cpu::{Registers, Stack, OPCODES},
     errors::VMError,
     io::{Keyboard, Screen},
     memory::RAM,
 };
+
+pub use crate::cpu::Signal;
 
 #[derive(Default)]
 pub struct VM {
@@ -125,13 +126,12 @@ impl VM {
         Ok(())
     }
 
-    pub fn exec_next_opcode(&mut self, debug_dump: bool) -> Result<(), VMError> {
+    pub fn exec_next_opcode(&mut self, debug_dump: bool) -> Result<Signal, VMError> {
         let binary_opcode = self.memory.get_opcode(self.registers.get_pc() as usize)?;
-        self.exec_opcode(binary_opcode, debug_dump)?;
-        Ok(())
+        self.exec_opcode(binary_opcode, debug_dump)
     }
 
-    pub fn exec_opcode(&mut self, binary_opcode: u16, debug_dump: bool) -> Result<(), VMError> {
+    pub fn exec_opcode(&mut self, binary_opcode: u16, debug_dump: bool) -> Result<Signal, VMError> {
         for opcode in OPCODES {
             if opcode.check(binary_opcode) {
                 if debug_dump {
@@ -145,7 +145,7 @@ impl VM {
                         &mut self.screen,
                     );
                 }
-                opcode.instructions()(
+                let signal = opcode.instructions()(
                     binary_opcode,
                     &mut self.stack,
                     &mut self.memory,
@@ -164,7 +164,7 @@ impl VM {
                         &mut self.screen,
                     );
                 }
-                return Ok(());
+                return Ok(signal);
             }
         }
         Err(VMError::InvalidOpcode(binary_opcode))
