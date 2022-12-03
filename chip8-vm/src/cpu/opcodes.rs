@@ -10,6 +10,7 @@ use super::{Registers, Stack};
 pub enum Signal {
     NoSignal,
     DrawScreen,
+    WaitKeyUp(u8),
 }
 
 type OpcodeInstructions = fn(
@@ -943,6 +944,8 @@ fn ld_vx_dt(
     Ok(Signal::NoSignal)
 }
 
+static mut WAIT_KEYUP: Option<u8> = None;
+
 // Instructions for opcode pattern Fx0A. Wait for a key press, store the value fo the key in Vx.
 fn ld_vx_key(
     opcode: u16,
@@ -952,18 +955,26 @@ fn ld_vx_key(
     keyboard: &Keyboard,
     _screen: &mut Screen,
 ) -> Result<Signal, VMError> {
-    let mut key_down = false;
-    // loop through all keys
-    for key in 0x0..=0xF as u8 {
-        if keyboard.is_key_down(key) {
-            registers.set_v_register(((opcode & 0x0F00) >> 8) as usize, key);
-            key_down = true;
+    unsafe {
+        if let Some(key) = WAIT_KEYUP {
+            if keyboard.is_key_up(key) {
+                WAIT_KEYUP = None;
+                registers.set_v_register(((opcode & 0x0F00) >> 8) as usize, key);
+                registers.inc_pc()?;
+                return Ok(Signal::NoSignal);
+            }
+        } else {
+            // check for key down through all keys
+            for key in 0x0..=0xF as u8 {
+                if keyboard.is_key_down(key) {
+                    WAIT_KEYUP = Some(key);
+                    return Ok(Signal::WaitKeyUp(key));
+                }
+            }
         }
     }
-    // If key is pressed execute next opcode
-    if key_down {
-        registers.inc_pc()?;
-    }
+
+    // return without PC inc, repeat wait for keydown
     Ok(Signal::NoSignal)
 }
 
@@ -1098,6 +1109,7 @@ fn ld_bcd_vx(
     registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
+
 // Instructions for opcode pattern Fx55. Store registers V0 through Vx in memory starting at location I.
 fn ld_i_vx(
     opcode: u16,

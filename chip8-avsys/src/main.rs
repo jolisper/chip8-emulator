@@ -18,7 +18,7 @@ use std::time::Duration;
 use crate::config::*;
 use chip8_vm::{Signal, VM};
 
-pub static KEYMAP: &'static [(i32, usize)] = &[
+static KEYMAP: &'static [(i32, usize)] = &[
     (SDL_KeyCode::SDLK_1 as i32, 0x1),
     (SDL_KeyCode::SDLK_2 as i32, 0x2),
     (SDL_KeyCode::SDLK_3 as i32, 0x3),
@@ -35,6 +35,25 @@ pub static KEYMAP: &'static [(i32, usize)] = &[
     (SDL_KeyCode::SDLK_x as i32, 0x0),
     (SDL_KeyCode::SDLK_c as i32, 0xB),
     (SDL_KeyCode::SDLK_v as i32, 0xF),
+];
+
+static INVERSE_KEYMAP: &'static [(usize, i32)] = &[
+    (0x1, SDL_KeyCode::SDLK_1 as i32),
+    (0x2, SDL_KeyCode::SDLK_2 as i32),
+    (0x3, SDL_KeyCode::SDLK_3 as i32),
+    (0xC, SDL_KeyCode::SDLK_4 as i32),
+    (0x4, SDL_KeyCode::SDLK_q as i32),
+    (0x5, SDL_KeyCode::SDLK_w as i32),
+    (0x6, SDL_KeyCode::SDLK_e as i32),
+    (0xD, SDL_KeyCode::SDLK_r as i32),
+    (0x7, SDL_KeyCode::SDLK_a as i32),
+    (0x8, SDL_KeyCode::SDLK_s as i32),
+    (0x9, SDL_KeyCode::SDLK_d as i32),
+    (0xE, SDL_KeyCode::SDLK_f as i32),
+    (0xA, SDL_KeyCode::SDLK_z as i32),
+    (0x0, SDL_KeyCode::SDLK_x as i32),
+    (0xB, SDL_KeyCode::SDLK_c as i32),
+    (0xF, SDL_KeyCode::SDLK_v as i32),
 ];
 
 struct SquareWave {
@@ -134,6 +153,30 @@ pub fn main() -> Result<(), String> {
             Signal::DrawScreen => {
                 draw_screen(&mut chip8, &mut canvas)?;
             }
+            Signal::WaitKeyUp(key) => {
+                'wait_keyup: loop {
+                    for event in event_pump.poll_iter() {
+                        match event {
+                            Event::KeyUp {
+                                keycode: Some(kc), ..
+                            } => {
+                                if let Some(sdl_key)= ch8_key2sdl_key(key as usize) {
+                                    if sdl_key == kc as i32 {
+                                        chip8.keyboard_key_up(sdl_key, KEYMAP);
+                                        break 'wait_keyup
+                                    }
+                                }
+                            }
+                            Event::Quit { .. }
+                            | Event::KeyDown {
+                                keycode: Some(Keycode::Escape),
+                                ..
+                            } => break 'running,
+                            _ => {}
+                        }
+                    }
+                }
+           }
             _ => {}
         }
     }
@@ -175,4 +218,13 @@ fn draw_screen(chip8: &mut VM, canvas: &mut Canvas<Window>) -> Result<(), String
     }
     canvas.present();
     Ok(())
+}
+
+fn ch8_key2sdl_key(key: usize) -> Option<i32> {
+    for (ch8_k, sdl_k) in INVERSE_KEYMAP.into_iter() {
+        if key == *ch8_k {
+            return Some(*sdl_k);
+        }
+    }
+    None
 }
