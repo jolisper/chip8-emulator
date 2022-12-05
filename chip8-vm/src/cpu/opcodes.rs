@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use crate::{
     config::CHIP8_TOTAL_STANDARD_OPCODES,
     errors::VMError,
@@ -944,7 +946,9 @@ fn ld_vx_dt(
     Ok(Signal::NoSignal)
 }
 
-static mut WAIT_KEYUP: Option<u8> = None;
+thread_local! {
+    static WAIT_KEYUP: Cell<Option<u8>> = Cell::new(None);
+}
 
 // Instructions for opcode pattern Fx0A. Wait for a key press, store the value fo the key in Vx.
 fn ld_vx_key(
@@ -955,27 +959,28 @@ fn ld_vx_key(
     keyboard: &Keyboard,
     _screen: &mut Screen,
 ) -> Result<Signal, VMError> {
-    unsafe {
-        if let Some(key) = WAIT_KEYUP {
-            if keyboard.is_key_up(key) {
-                WAIT_KEYUP = None;
-                registers.set_v_register(((opcode & 0x0F00) >> 8) as usize, key);
-                registers.inc_pc()?;
-                return Ok(Signal::NoSignal);
+    WAIT_KEYUP.with(|f| {
+        let mut signal = Ok(Signal::NoSignal);
+        match f.get() {
+            Some(key) => {
+                if keyboard.is_key_up(key) {
+                    registers.set_v_register(((opcode & 0x0F00) >> 8) as usize, key);
+                    registers.inc_pc()?;
+                    f.set(None);
+                }
             }
-        } else {
-            // check for key down through all keys
-            for key in 0x0..=0xF as u8 {
-                if keyboard.is_key_down(key) {
-                    WAIT_KEYUP = Some(key);
-                    return Ok(Signal::WaitKeyUp(key));
+            None => {
+                // check for key down through all keys
+                for key in 0x0..=0xF as u8 {
+                    if keyboard.is_key_down(key) {
+                        signal = Ok(Signal::WaitKeyUp(key));
+                        f.set(Some(key));
+                    }
                 }
             }
         }
-    }
-
-    // return without PC inc, repeat wait for keydown
-    Ok(Signal::NoSignal)
+        signal
+    })
 }
 
 // Instructions for opcode pattern Fx15. Set delay timer = Vx.
