@@ -126,48 +126,67 @@ impl VM {
         Ok(())
     }
 
-    pub fn exec_next_opcode(&mut self, debug_dump: bool) -> Result<Signal, VMError> {
+    pub fn exec_next_opcode(&mut self, debug_dump: bool, calls_count: &mut u32) -> Result<Signal, VMError> {
         let binary_opcode = self.memory.get_opcode(self.registers.get_pc() as usize)?;
-        self.exec_opcode(binary_opcode, debug_dump)
+        self.exec_opcode(binary_opcode, debug_dump, calls_count)
     }
 
-    pub fn exec_opcode(&mut self, binary_opcode: u16, debug_dump: bool) -> Result<Signal, VMError> {
-        for opcode in OPCODES {
-            if opcode.check(binary_opcode) {
-                if debug_dump {
-                    opcode.pre_ex_dump()(
-                        opcode.pattern(),
-                        binary_opcode,
-                        &mut self.stack,
-                        &mut self.memory,
-                        &mut self.registers,
-                        &self.keyboard,
-                        &mut self.screen,
-                    );
-                }
-                let signal = opcode.instructions()(
-                    binary_opcode,
-                    &mut self.stack,
-                    &mut self.memory,
-                    &mut self.registers,
-                    &self.keyboard,
-                    &mut self.screen,
-                )?;
-                if debug_dump {
-                    opcode.post_ex_dump()(
-                        opcode.pattern(),
-                        binary_opcode,
-                        &mut self.stack,
-                        &mut self.memory,
-                        &mut self.registers,
-                        &self.keyboard,
-                        &mut self.screen,
-                    );
-                }
-                return Ok(signal);
+    pub fn exec_opcode(&mut self, binary_opcode: u16, debug_dump: bool, calls_count: &mut u32) -> Result<Signal, VMError> {
+        OPCODES.with(|f| {
+            let mut op_calls = f.borrow_mut();
+            if *calls_count > 1000 {
+                println!("{}", *calls_count);
+                op_calls.sort_by(|a, b| {
+                    let (_, calls_a) = a;
+                    let (_, calls_b) = b;
+                    calls_b.partial_cmp(calls_a).unwrap()
+                });
+                *calls_count = 0;
+                println!();
+                println!("{}", op_calls);
+                println!();
             }
-        }
-        Err(VMError::InvalidOpcode(binary_opcode))
+            *calls_count += 1;
+            for (opcode, calls) in op_calls.iter_mut() {
+                if opcode.check(binary_opcode) {
+                    if debug_dump {
+                        opcode.pre_ex_dump()(
+                            opcode.pattern(),
+                            binary_opcode,
+                            &mut self.stack,
+                            &mut self.memory,
+                            &mut self.registers,
+                            &self.keyboard,
+                            &mut self.screen,
+                        );
+                    }
+                    let signal = opcode.instructions()(
+                        binary_opcode,
+                        &mut self.stack,
+                        &mut self.memory,
+                        &mut self.registers,
+                        &self.keyboard,
+                        &mut self.screen,
+                    )?;
+                    if calls.checked_add(1).is_some() {
+                        *calls += 1;
+                    }
+                    if debug_dump {
+                        opcode.post_ex_dump()(
+                            opcode.pattern(),
+                            binary_opcode,
+                            &mut self.stack,
+                            &mut self.memory,
+                            &mut self.registers,
+                            &self.keyboard,
+                            &mut self.screen,
+                        );
+                    }
+                    return Ok(signal);
+                }
+            }
+            Err(VMError::InvalidOpcode(binary_opcode))
+        })
     }
 }
 
@@ -181,7 +200,7 @@ mod tests {
         chip8.registers.set_pc(0x0200);
 
         // Call
-        chip8.exec_opcode(0x2300, false).expect("Call");
+        chip8.exec_opcode(0x2300, false, &mut 0).expect("Call");
 
         assert_eq!(chip8.registers.get_sp(), 0x001);
         assert_eq!(
@@ -195,7 +214,7 @@ mod tests {
 
         // Return
         chip8
-            .exec_opcode(0x00EE, false)
+            .exec_opcode(0x00EE, false, &mut 0)
             .expect("Return from subroutine");
         assert_eq!(chip8.registers.get_pc(), 0x0202);
         assert_eq!(chip8.registers.get_sp(), 0x0000);
@@ -206,7 +225,7 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
 
-        chip8.exec_opcode(0x1300, false).expect("Jump");
+        chip8.exec_opcode(0x1300, false, &mut 0).expect("Jump");
 
         assert_eq!(chip8.registers.get_pc(), 0x0300);
     }
@@ -218,7 +237,7 @@ mod tests {
         chip8.registers.set_v_register(0, 0x001);
 
         chip8
-            .exec_opcode(0x3001, false)
+            .exec_opcode(0x3001, false, &mut 0)
             .expect("Skip next instruction");
 
         assert_eq!(chip8.registers.get_pc(), 0x0204);
@@ -231,7 +250,7 @@ mod tests {
         chip8.registers.set_v_register(0, 0x001);
 
         chip8
-            .exec_opcode(0x3002, false)
+            .exec_opcode(0x3002, false, &mut 0)
             .expect("not skip next instruction");
 
         assert_eq!(chip8.registers.get_pc(), 0x0202);
@@ -245,7 +264,7 @@ mod tests {
         chip8.registers.set_v_register(1, 0x001);
 
         chip8
-            .exec_opcode(0x5010, false)
+            .exec_opcode(0x5010, false, &mut 0)
             .expect("Skip next instruction if Vx = Vy");
 
         assert_eq!(chip8.registers.get_pc(), 0x0204);
@@ -259,7 +278,7 @@ mod tests {
         chip8.registers.set_v_register(1, 0x001);
 
         chip8
-            .exec_opcode(0x5010, false)
+            .exec_opcode(0x5010, false, &mut 0)
             .expect("Not skip next instruction if Vx = Vy");
 
         assert_eq!(chip8.registers.get_pc(), 0x0202);
@@ -271,7 +290,7 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 0x01);
 
-        chip8.exec_opcode(0x4002, false).expect("Jump");
+        chip8.exec_opcode(0x4002, false, &mut 0).expect("Jump");
 
         assert_eq!(chip8.registers.get_pc(), 0x0204);
     }
@@ -282,7 +301,7 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 0x01);
 
-        chip8.exec_opcode(0x4001, false).expect("No jump");
+        chip8.exec_opcode(0x4001, false, &mut 0).expect("No jump");
 
         assert_eq!(chip8.registers.get_pc(), 0x0202);
     }
@@ -291,8 +310,8 @@ mod tests {
     fn add_vx_byte() {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
-        chip8.exec_opcode(0x60fe, false).expect("Set V0 to 255");
-        chip8.exec_opcode(0x7001, false).expect("Set V0 = V0 + KK");
+        chip8.exec_opcode(0x60fe, false, &mut 0).expect("Set V0 to 255");
+        chip8.exec_opcode(0x7001, false, &mut 0).expect("Set V0 = V0 + KK");
 
         assert_eq!(chip8.registers.v_0, 255);
         assert_eq!(chip8.registers.get_pc(), 0x0204);
@@ -305,7 +324,7 @@ mod tests {
         chip8.registers.set_v_register(0, 200);
         chip8.registers.set_v_register(1, 60);
         chip8
-            .exec_opcode(0x8014, false)
+            .exec_opcode(0x8014, false, &mut 0)
             .expect("Set V0 = V0 + V1, with carry");
 
         assert_eq!(chip8.registers.v_0, 4);
@@ -320,7 +339,7 @@ mod tests {
         chip8.registers.set_v_register(0, 200);
         chip8.registers.set_v_register(1, 50);
         chip8
-            .exec_opcode(0x8014, false)
+            .exec_opcode(0x8014, false, &mut 0)
             .expect("Set V0 = V0 + V1, not carry");
 
         assert_eq!(chip8.registers.v_0, 250);
@@ -335,7 +354,7 @@ mod tests {
         chip8.registers.set_v_register(0, 255);
         chip8.registers.set_v_register(1, 254);
         chip8
-            .exec_opcode(0x8015, false)
+            .exec_opcode(0x8015, false, &mut 0)
             .expect("Set V0 = V0 - V1, with carry");
 
         assert_eq!(chip8.registers.v_0, 1);
@@ -350,7 +369,7 @@ mod tests {
         chip8.registers.set_v_register(0, 254);
         chip8.registers.set_v_register(1, 255);
         chip8
-            .exec_opcode(0x8015, false)
+            .exec_opcode(0x8015, false, &mut 0)
             .expect("Set V0 = V0 - V1, not carry");
 
         assert_eq!(chip8.registers.v_0, 255);
@@ -363,8 +382,8 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.registers.unset_vf();
-        chip8.exec_opcode(0x7005, false).expect("Set V0 to 5");
-        chip8.exec_opcode(0x8006, false).expect("Set carry");
+        chip8.exec_opcode(0x7005, false, &mut 0).expect("Set V0 to 5");
+        chip8.exec_opcode(0x8006, false, &mut 0).expect("Set carry");
 
         assert_eq!(chip8.registers.v_0, 2);
         assert_eq!(chip8.registers.v_f, 1);
@@ -376,8 +395,8 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_vf();
-        chip8.exec_opcode(0x600a, false).expect("Set V0 to 10");
-        chip8.exec_opcode(0x8006, false).expect("Set not carry");
+        chip8.exec_opcode(0x600a, false, &mut 0).expect("Set V0 to 10");
+        chip8.exec_opcode(0x8006, false, &mut 0).expect("Set not carry");
 
         assert_eq!(chip8.registers.v_0, 5);
         assert_eq!(chip8.registers.v_f, 0);
@@ -389,10 +408,10 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.registers.unset_vf();
-        chip8.exec_opcode(0x60fe, false).expect("Set V0 to 254");
-        chip8.exec_opcode(0x71ff, false).expect("Set V1 to 255");
+        chip8.exec_opcode(0x60fe, false, &mut 0).expect("Set V0 to 254");
+        chip8.exec_opcode(0x71ff, false, &mut 0).expect("Set V1 to 255");
         chip8
-            .exec_opcode(0x8017, false)
+            .exec_opcode(0x8017, false, &mut 0)
             .expect("Set V0 = V1 - V0, with borrow");
 
         assert_eq!(chip8.registers.v_0, 1);
@@ -405,10 +424,10 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_vf();
-        chip8.exec_opcode(0x60ff, false).expect("Set V0 to 255");
-        chip8.exec_opcode(0x71fe, false).expect("Set V1 to 254");
+        chip8.exec_opcode(0x60ff, false, &mut 0).expect("Set V0 to 255");
+        chip8.exec_opcode(0x71fe, false, &mut 0).expect("Set V1 to 254");
         chip8
-            .exec_opcode(0x8017, false)
+            .exec_opcode(0x8017, false, &mut 0)
             .expect("Set V0 = V1 - V0, not borrow");
 
         assert_eq!(chip8.registers.v_0, 255);
@@ -421,8 +440,8 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.registers.unset_vf();
-        chip8.exec_opcode(0x6080, false).expect("Set V0 to 128");
-        chip8.exec_opcode(0x800E, false).expect("Set carry");
+        chip8.exec_opcode(0x6080, false, &mut 0).expect("Set V0 to 128");
+        chip8.exec_opcode(0x800E, false, &mut 0).expect("Set carry");
 
         assert_eq!(chip8.registers.v_0, 0);
         assert_eq!(chip8.registers.v_f, 1);
@@ -434,8 +453,8 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_vf();
-        chip8.exec_opcode(0x607f, false).expect("Set V0 to 127");
-        chip8.exec_opcode(0x800E, false).expect("Set not carry");
+        chip8.exec_opcode(0x607f, false, &mut 0).expect("Set V0 to 127");
+        chip8.exec_opcode(0x800E, false, &mut 0).expect("Set not carry");
 
         assert_eq!(chip8.registers.v_0, 254);
         assert_eq!(chip8.registers.v_f, 0);
@@ -446,10 +465,10 @@ mod tests {
     fn sne_vx_vy() {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
-        chip8.exec_opcode(0x60ff, false).expect("Set V0 to 255");
-        chip8.exec_opcode(0x61ee, false).expect("Set V1 t0 255");
+        chip8.exec_opcode(0x60ff, false, &mut 0).expect("Set V0 to 255");
+        chip8.exec_opcode(0x61ee, false, &mut 0).expect("Set V1 t0 255");
         chip8
-            .exec_opcode(0x9010, false)
+            .exec_opcode(0x9010, false, &mut 0)
             .expect("Skip next instruction");
 
         assert_eq!(chip8.registers.get_pc(), 0x0208);
@@ -459,10 +478,10 @@ mod tests {
     fn sne_vx_vy_not_skip() {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
-        chip8.exec_opcode(0x60FF, false).expect("Set V0 to 255");
-        chip8.exec_opcode(0x61FF, false).expect("Set V1 t0 255");
+        chip8.exec_opcode(0x60FF, false, &mut 0).expect("Set V0 to 255");
+        chip8.exec_opcode(0x61FF, false, &mut 0).expect("Set V1 t0 255");
         chip8
-            .exec_opcode(0x9010, false)
+            .exec_opcode(0x9010, false, &mut 0)
             .expect("Skip next instruction");
 
         assert_eq!(chip8.registers.get_pc(), 0x0206);
@@ -472,7 +491,7 @@ mod tests {
     fn ld_i_addr() {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
-        chip8.exec_opcode(0xAFFF, false).expect("Set I to FFF");
+        chip8.exec_opcode(0xAFFF, false, &mut 0).expect("Set I to FFF");
 
         assert_eq!(chip8.registers.get_i(), 0x0FFF);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
@@ -482,9 +501,9 @@ mod tests {
     fn jp_v0_addr() {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
-        chip8.exec_opcode(0x6002, false).expect("Set V0 to 002");
+        chip8.exec_opcode(0x6002, false, &mut 0).expect("Set V0 to 002");
         chip8
-            .exec_opcode(0xB300, false)
+            .exec_opcode(0xB300, false, &mut 0)
             .expect("Set PC to V0 + 002");
 
         assert_eq!(chip8.registers.get_pc(), 0x0302);
@@ -498,11 +517,11 @@ mod tests {
         // No collision, yet
         assert_eq!(chip8.registers.get_v_register(0xF), 0);
 
-        chip8.exec_opcode(0xA000, false).expect("Set I to 00");
-        chip8.exec_opcode(0x600A, false).expect("Set V0 to 10");
-        chip8.exec_opcode(0x610A, false).expect("Set V1 to 10");
+        chip8.exec_opcode(0xA000, false, &mut 0).expect("Set I to 00");
+        chip8.exec_opcode(0x600A, false, &mut 0).expect("Set V0 to 10");
+        chip8.exec_opcode(0x610A, false, &mut 0).expect("Set V1 to 10");
         chip8
-            .exec_opcode(0xD015, false)
+            .exec_opcode(0xD015, false, &mut 0)
             .expect("Draw 5 bytes sprite");
 
         // Expect that '0' is printed in screen at (10, 10)
@@ -532,46 +551,46 @@ mod tests {
 
         assert_eq!(chip8.registers.get_pc(), 0x0208);
 
-        chip8.exec_opcode(0x600D, false).expect("Set V0 to 13");
-        chip8.exec_opcode(0x610E, false).expect("Set V1 to 14");
+        chip8.exec_opcode(0x600D, false, &mut 0).expect("Set V0 to 13");
+        chip8.exec_opcode(0x610E, false, &mut 0).expect("Set V1 to 14");
         chip8
-            .exec_opcode(0xD015, false)
+            .exec_opcode(0xD015, false, &mut 0)
             .expect("Draw 5 bytes sprite");
         // Collision!
         assert_eq!(chip8.registers.get_v_register(0xF), 1);
 
         assert_eq!(chip8.registers.get_pc(), 0x020E);
 
-        chip8.exec_opcode(0x600A, false).expect("Set V0 to 10");
-        chip8.exec_opcode(0x6112, false).expect("Set V1 to 18");
+        chip8.exec_opcode(0x600A, false, &mut 0).expect("Set V0 to 10");
+        chip8.exec_opcode(0x6112, false, &mut 0).expect("Set V1 to 18");
         chip8
-            .exec_opcode(0xD015, false)
+            .exec_opcode(0xD015, false, &mut 0)
             .expect("Draw 5 bytes sprite");
         // Collision!
         assert_eq!(chip8.registers.get_v_register(0xF), 1);
 
         assert_eq!(chip8.registers.get_pc(), 0x0214);
 
-        chip8.exec_opcode(0x6010, false).expect("Set V0 to 16");
-        chip8.exec_opcode(0x610A, false).expect("Set V1 to 10");
+        chip8.exec_opcode(0x6010, false, &mut 0).expect("Set V0 to 16");
+        chip8.exec_opcode(0x610A, false, &mut 0).expect("Set V1 to 10");
         chip8
-            .exec_opcode(0xD015, false)
+            .exec_opcode(0xD015, false, &mut 0)
             .expect("Draw 5 bytes sprite");
         // Collision!
         assert_eq!(chip8.registers.get_v_register(0xF), 1);
 
-        chip8.exec_opcode(0x6010, false).expect("Set V0 to 16");
-        chip8.exec_opcode(0x6112, false).expect("Set V1 to 18");
+        chip8.exec_opcode(0x6010, false, &mut 0).expect("Set V0 to 16");
+        chip8.exec_opcode(0x6112, false, &mut 0).expect("Set V1 to 18");
         chip8
-            .exec_opcode(0xD015, false)
+            .exec_opcode(0xD015, false, &mut 0)
             .expect("Draw 5 bytes sprite");
         // Collision!
         assert_eq!(chip8.registers.get_v_register(0xF), 1);
 
-        chip8.exec_opcode(0x6014, false).expect("Set V0 to 13");
-        chip8.exec_opcode(0x610E, false).expect("Set V1 to 14");
+        chip8.exec_opcode(0x6014, false, &mut 0).expect("Set V0 to 13");
+        chip8.exec_opcode(0x610E, false, &mut 0).expect("Set V1 to 14");
         chip8
-            .exec_opcode(0xD015, false)
+            .exec_opcode(0xD015, false, &mut 0)
             .expect("Draw 5 bytes sprite");
 
         // Collision!
@@ -603,11 +622,11 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.keyboard_key_down(97, KEYMAP); // User press 'A' key
         chip8
-            .exec_opcode(0x6007, false)
+            .exec_opcode(0x6007, false, &mut 0)
             .expect("Set V0 to match A key");
         assert_eq!(chip8.registers.get_v_register(0), 0x7);
         chip8
-            .exec_opcode(0xE09E, false)
+            .exec_opcode(0xE09E, false, &mut 0)
             .expect("Skip next instruction");
         assert_eq!(chip8.registers.get_pc(), 0x0206);
     }
@@ -618,10 +637,10 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.keyboard_key_up(97, KEYMAP); // User release 'A' key
         chip8
-            .exec_opcode(0x600A, false)
+            .exec_opcode(0x600A, false, &mut 0)
             .expect("Set V0 to match A key");
         chip8
-            .exec_opcode(0xE09E, false)
+            .exec_opcode(0xE09E, false, &mut 0)
             .expect("Not skip next instruction");
         assert_eq!(chip8.registers.get_pc(), 0x0204);
     }
@@ -632,7 +651,7 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_dt(0x0A);
         chip8
-            .exec_opcode(0xF007, false)
+            .exec_opcode(0xF007, false, &mut 0)
             .expect("Set V0 to delay timer value");
         assert_eq!(chip8.registers.get_v_register(0), 0x0A);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
@@ -643,7 +662,7 @@ mod tests {
         let mut chip8: VM = VM::new();
         chip8.registers.set_pc(0x0200);
         chip8.keyboard_key_down(97, KEYMAP);
-        chip8.exec_opcode(0xF00A, false).expect("Set V0 to 0xA key");
+        chip8.exec_opcode(0xF00A, false, &mut 0).expect("Set V0 to 0xA key");
         assert_eq!(chip8.registers.get_v_register(0), 0x7);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
     }
@@ -654,7 +673,7 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 10);
         chip8
-            .exec_opcode(0xF015, false)
+            .exec_opcode(0xF015, false, &mut 0)
             .expect("Set delay timer to Vx");
         assert_eq!(chip8.registers.get_dt(), 0x0A);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
@@ -666,7 +685,7 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 10);
         chip8
-            .exec_opcode(0xF018, false)
+            .exec_opcode(0xF018, false, &mut 0)
             .expect("Set sound timer to Vx");
         assert_eq!(chip8.registers.st, 0x0A);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
@@ -679,7 +698,7 @@ mod tests {
         chip8.registers.set_v_register(0, 10);
         chip8.registers.set_i(10);
         chip8
-            .exec_opcode(0xF01E, false)
+            .exec_opcode(0xF01E, false, &mut 0)
             .expect("Set I = I + V0 = 20");
         assert_eq!(chip8.registers.get_i(), 0x14);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
@@ -691,7 +710,7 @@ mod tests {
         chip8.registers.set_pc(0x0200);
         chip8.registers.set_v_register(0, 0x02);
         chip8
-            .exec_opcode(0xF029, false)
+            .exec_opcode(0xF029, false, &mut 0)
             .expect("Set I = location of sprite for digit Vx");
         assert_eq!(chip8.registers.get_i(), 0x0A);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
@@ -704,7 +723,7 @@ mod tests {
         chip8.registers.set_i(0x200);
         chip8.registers.set_v_register(0, 245);
         chip8
-            .exec_opcode(0xF033, false)
+            .exec_opcode(0xF033, false, &mut 0)
             .expect("Store BCD representation of Vx in memory locations I, I+1, and I+2");
 
         let base_addr = 0x200;
@@ -738,7 +757,7 @@ mod tests {
         chip8.registers.set_v_register(0xF, 0x00F);
 
         chip8
-            .exec_opcode(0xFF55, false)
+            .exec_opcode(0xFF55, false, &mut 0)
             .expect("Store registers V0 through Vx in memory starting at location I.");
 
         let base_addr = 0x200 as usize;
@@ -835,7 +854,7 @@ mod tests {
             .expect("Store value");
 
         chip8
-            .exec_opcode(0xFF65, false)
+            .exec_opcode(0xFF65, false, &mut 0)
             .expect("Store registers V0 through Vx in memory starting at location I.");
 
         assert_eq!(chip8.registers.get_v_register(0x0), 0x000);

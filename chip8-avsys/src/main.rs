@@ -114,6 +114,7 @@ pub fn main() -> Result<(), String> {
 
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     let mut event_pump = sdl_context.event_pump()?;
+    let mut calls_count = 0;
 
     'running: loop {
         for event in event_pump.poll_iter() {
@@ -149,34 +150,32 @@ pub fn main() -> Result<(), String> {
             device.pause();
         }
 
-        match chip8.exec_next_opcode(debug_mode)? {
+        match chip8.exec_next_opcode(debug_mode, &mut calls_count)? {
             Signal::DrawScreen => {
                 draw_screen(&mut chip8, &mut canvas)?;
             }
-            Signal::WaitKeyUp(key) => {
-                'wait_keyup: loop {
-                    for event in event_pump.poll_iter() {
-                        match event {
-                            Event::KeyUp {
-                                keycode: Some(kc), ..
-                            } => {
-                                if let Some(sdl_key)= ch8_key2sdl_key(key as usize) {
-                                    if sdl_key == kc as i32 {
-                                        chip8.keyboard_key_up(sdl_key, KEYMAP);
-                                        break 'wait_keyup
-                                    }
+            Signal::WaitKeyUp(key) => 'wait_keyup: loop {
+                for event in event_pump.poll_iter() {
+                    match event {
+                        Event::KeyUp {
+                            keycode: Some(kc), ..
+                        } => {
+                            if let Some(sdl_key) = ch8_key2sdl_key(key as usize) {
+                                if sdl_key == kc as i32 {
+                                    chip8.keyboard_key_up(sdl_key, KEYMAP);
+                                    break 'wait_keyup;
                                 }
                             }
-                            Event::Quit { .. }
-                            | Event::KeyDown {
-                                keycode: Some(Keycode::Escape),
-                                ..
-                            } => break 'running,
-                            _ => {}
                         }
+                        Event::Quit { .. }
+                        | Event::KeyDown {
+                            keycode: Some(Keycode::Escape),
+                            ..
+                        } => break 'running,
+                        _ => {}
                     }
                 }
-           }
+            },
             _ => {}
         }
     }

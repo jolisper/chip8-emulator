@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::{cell::{Cell, RefCell}, fmt::Display, ops::{DerefMut, Deref}};
 
 use crate::{
     config::CHIP8_TOTAL_STANDARD_OPCODES,
@@ -315,43 +315,76 @@ const LD_VX_I: Opcode = Opcode {
     post_ex_dump: dft_post_ex_dump,
 };
 
-pub const OPCODES: [Opcode; CHIP8_TOTAL_STANDARD_OPCODES] = [
-    CLS,
-    RET,
-    SYS,
-    JP,
-    CALL,
-    SE_VX_BYTE,
-    SNE_VX_KK,
-    SE_VX_VY,
-    LD_VX_BYTE,
-    ADD_VX_BYTE,
-    LD_VX_VY,
-    OR_VX_VY,
-    AND_VX_VY,
-    XOR_VX_VY,
-    ADD_VX_VY,
-    SUB_VX_VY,
-    SHR_VX,
-    SUBN_VX_VY,
-    SHL_VX,
-    SNE_VX_VY,
-    LD_I_ADDR,
-    JP_V0_ADDR,
-    RND_VX_BYTE,
-    DRW_VX_VY_NB,
-    SKP_VX,
-    SKNP_VX,
-    LD_VX_DTIMER,
-    LD_VX_K,
-    LD_DTIMER_VX,
-    LD_STIMER_VX,
-    ADD_I_VX,
-    LD_F_VX,
-    LD_BCD_VX,
-    LD_I_VX,
-    LD_VX_I,
-];
+pub struct CountedOpcodes([(Opcode, u64); CHIP8_TOTAL_STANDARD_OPCODES]); 
+
+impl CountedOpcodes {
+    fn new(ops: [(Opcode, u64); CHIP8_TOTAL_STANDARD_OPCODES]) -> Self{
+        CountedOpcodes(ops)
+    }
+}
+
+impl Display for CountedOpcodes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (op, count) in self.0.iter() {
+            write!(f, "({}, {})\n", op, count)?;
+        }
+        Ok(())
+    }
+}
+
+impl Deref for CountedOpcodes {
+    type Target = [(Opcode, u64); CHIP8_TOTAL_STANDARD_OPCODES];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for CountedOpcodes {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+thread_local! {
+pub static OPCODES: RefCell<CountedOpcodes> = RefCell::new(CountedOpcodes::new([
+    (CLS,u64::MAX),
+    (RET,u64::MAX),
+    (SYS,u64::MAX),
+    (JP,0),
+    (CALL,0),
+    (SE_VX_BYTE,0),
+    (SNE_VX_KK,0),
+    (SE_VX_VY,0),
+    (LD_VX_BYTE,0),
+    (ADD_VX_BYTE,0),
+    (LD_VX_VY,0),
+    (OR_VX_VY,0),
+    (AND_VX_VY,0),
+    (XOR_VX_VY,0),
+    (ADD_VX_VY,0),
+    (SUB_VX_VY,0),
+    (SHR_VX,0),
+    (SUBN_VX_VY,0),
+    (SHL_VX,0),
+    (SNE_VX_VY,0),
+    (LD_I_ADDR,0),
+    (JP_V0_ADDR,0),
+    (RND_VX_BYTE,0),
+    (DRW_VX_VY_NB,0),
+    (SKP_VX,0),
+    (SKNP_VX,0),
+    (LD_VX_DTIMER,0),
+    (LD_VX_K,0),
+    (LD_DTIMER_VX,0),
+    (LD_STIMER_VX,0),
+    (ADD_I_VX,0),
+    (LD_F_VX,0),
+    (LD_BCD_VX,0),
+    (LD_I_VX,0),
+    (LD_VX_I,0),
+]));
+}
 
 fn dft_pre_ex_dump(
     pattern: &'static str,
@@ -448,6 +481,12 @@ impl Opcode {
 
     pub fn pattern(&self) -> &'static str {
         self.pattern
+    }
+}
+
+impl Display for Opcode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.pattern())
     }
 }
 
