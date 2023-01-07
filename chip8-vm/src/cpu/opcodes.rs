@@ -745,13 +745,14 @@ fn shr_vx(
     _keyboard: &Keyboard,
     _screen: &mut Screen,
 ) -> Result<Signal, VMError> {
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vy_value = registers.get_v_register(vy_index);
+    // let vy_index = ((opcode & 0x00F0) >> 4) as usize;
+    // let vy_value = registers.get_v_register(vy_index);
 
     let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    registers.set_v_register(vx_index, vy_value >> 1);
+    let vx_value = registers.get_v_register(vx_index);
+    registers.set_v_register(vx_index, vx_value >> 1);
 
-    let vx_lsb = vy_value & 0b0000_0001;
+    let vx_lsb = vx_value & 0b0000_0001;
     registers.unset_vf();
     if vx_lsb == 1 {
         registers.set_vf();
@@ -791,13 +792,14 @@ fn shl_vx(
     _keyboard: &Keyboard,
     _screen: &mut Screen,
 ) -> Result<Signal, VMError> {
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vy_value = registers.get_v_register(vy_index);
+    // let vy_index = ((opcode & 0x00F0) >> 4) as usize;
+    // let vy_value = registers.get_v_register(vy_index);
 
     let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    registers.set_v_register(vx_index, vy_value << 1);
+    let vx_value = registers.get_v_register(vx_index);
+    registers.set_v_register(vx_index, vx_value << 1);
 
-    let vx_msb = vy_value & 0b1000_0000;
+    let vx_msb = vx_value & 0b1000_0000;
     registers.unset_vf();
     if vx_msb > 0 {
         registers.set_vf();

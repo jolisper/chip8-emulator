@@ -13,10 +13,11 @@ use sdl2::sys::SDL_KeyCode;
 use sdl2::video::Window;
 use sdl2::AudioSubsystem;
 use std::io::Read;
-use std::time::Duration;
 
 use crate::config::*;
 use chip8_vm::{Signal, VM};
+
+const TIME_PER_FRAME_IN_MILLIS: u32 = 16;
 
 static KEYMAP: &'static [(i32, usize)] = &[
     (SDL_KeyCode::SDLK_1 as i32, 0x1),
@@ -99,9 +100,6 @@ pub fn main() -> Result<(), String> {
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video()?;
-    let audio_subsystem = sdl_context.audio()?;
-    let device = build_audio_device(&audio_subsystem);
-
     let window = video_subsystem
         .window(
             EMULATOR_WINDOW_TITLE,
@@ -111,11 +109,24 @@ pub fn main() -> Result<(), String> {
         .position_centered()
         .build()
         .map_err(|e| e.to_string())?;
+    let mut timer = sdl_context.timer()?;
+
+    let audio_subsystem = sdl_context.audio()?;
+    let device = build_audio_device(&audio_subsystem);
 
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     let mut event_pump = sdl_context.event_pump()?;
 
+    // Time
+    let mut start_time = 0;
+    let mut end_time: u32 = 0;
+    let mut delta;
+    let mut time_acc = 0;
+
     'running: loop {
+        delta = end_time - start_time;
+        time_acc += delta;
+
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
@@ -137,48 +148,47 @@ pub fn main() -> Result<(), String> {
             }
         }
 
-        if chip8.registers_dt() > 0 {
-            std::thread::sleep(Duration::from_millis(10));
-            chip8.registers_dec_dt();
-        }
-
+        // Beep sound
         if chip8.registers_st() > 0 {
             device.resume(); // Start playback
-            chip8.registers_dec_st();
         } else {
             device.pause();
         }
 
-        match chip8.exec_next_opcode(debug_mode)? {
+        match chip8.exec_next_opcode(debug_mode, &mut time_acc)? {
             Signal::DrawScreen => {
+                if delta < TIME_PER_FRAME_IN_MILLIS {
+                    timer.delay(TIME_PER_FRAME_IN_MILLIS - delta);
+                }
                 draw_screen(&mut chip8, &mut canvas)?;
             }
-            Signal::WaitKeyUp(key) => {
-                'wait_keyup: loop {
-                    for event in event_pump.poll_iter() {
-                        match event {
-                            Event::KeyUp {
-                                keycode: Some(kc), ..
-                            } => {
-                                if let Some(sdl_key)= ch8_key2sdl_key(key as usize) {
-                                    if sdl_key == kc as i32 {
-                                        chip8.keyboard_key_up(sdl_key, KEYMAP);
-                                        break 'wait_keyup
-                                    }
+            Signal::WaitKeyUp(key) => 'wait_keyup: loop {
+                for event in event_pump.poll_iter() {
+                    match event {
+                        Event::KeyUp {
+                            keycode: Some(kc), ..
+                        } => {
+                            if let Some(sdl_key) = ch8_key2sdl_key(key as usize) {
+                                if sdl_key == kc as i32 {
+                                    chip8.keyboard_key_up(sdl_key, KEYMAP);
+                                    break 'wait_keyup;
                                 }
                             }
-                            Event::Quit { .. }
-                            | Event::KeyDown {
-                                keycode: Some(Keycode::Escape),
-                                ..
-                            } => break 'running,
-                            _ => {}
                         }
+                        Event::Quit { .. }
+                        | Event::KeyDown {
+                            keycode: Some(Keycode::Escape),
+                            ..
+                        } => break 'running,
+                        _ => {}
                     }
                 }
-           }
+            },
             _ => {}
         }
+
+        start_time = end_time;
+        end_time = timer.ticks();
     }
 
     Ok(())
