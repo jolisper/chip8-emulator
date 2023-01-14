@@ -727,6 +727,10 @@ mod tests {
         chip8.keyboard_key_down(97, KEYMAP);
         chip8
             .exec_opcode(0xF00A, false, &mut 0)
+            .expect("Wait to key up");
+        chip8.keyboard_key_up(97, KEYMAP);
+        chip8
+            .exec_opcode(0xF00A, false, &mut 0)
             .expect("Set V0 to 0xA key");
         assert_eq!(chip8.registers.get_v_register(0), 0x7);
         assert_eq!(chip8.registers.get_pc(), 0x0202);
