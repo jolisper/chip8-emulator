@@ -15,26 +15,53 @@ pub enum Signal {
     WaitKeyUp(u8),
 }
 
-type OpcodeInstructions = fn(
-    opcode: u16,
-    stack: &mut Stack,
-    memory: &mut RAM,
-    registers: &mut Registers,
-    keyboard: &Keyboard,
-    screen: &mut Screen,
-) -> Result<Signal, VMError>;
+pub struct VMContext<'a> {
+    pub opcode: u16,
+    pub stack: &'a mut Stack,
+    pub memory: &'a mut RAM,
+    pub registers: &'a mut Registers,
+    pub keyboard: &'a Keyboard,
+    pub screen: &'a mut Screen,
+    pub pattern: &'a str,
+}
 
-type OpcodeDump = fn(
+type OpcodeInstructions = fn(cxt: &mut VMContext) -> Result<Signal, VMError>;
+
+type OpcodeDump = fn(ctx: &VMContext);
+
+pub struct OpcodeMatcher {
     pattern: &'static str,
-    opcode: u16,
-    stack: &mut Stack,
-    memory: &mut RAM,
-    registers: &mut Registers,
-    keyboard: &Keyboard,
-    screen: &mut Screen,
-);
+    bitmask: u16,
+    match_value: u16,
+    instructions: OpcodeInstructions,
+    pre_ex_dump: OpcodeDump,
+    post_ex_dump: OpcodeDump,
+}
 
-const CLS: Opcode = Opcode {
+impl OpcodeMatcher {
+    pub fn check_matching(&self, binary_opcode: u16) -> bool {
+        let masked = binary_opcode & self.bitmask;
+        masked == self.match_value
+    }
+
+    pub fn instructions(&self) -> OpcodeInstructions {
+        self.instructions
+    }
+
+    pub fn pre_ex_dump(&self) -> OpcodeDump {
+        self.pre_ex_dump
+    }
+
+    pub fn post_ex_dump(&self) -> OpcodeDump {
+        self.post_ex_dump
+    }
+
+    pub fn pattern(&self) -> &'static str {
+        self.pattern
+    }
+}
+
+const CLS: OpcodeMatcher = OpcodeMatcher {
     pattern: "00E0;CLS",
     bitmask: 0xFFFF,
     match_value: 0x00E0,
@@ -42,7 +69,7 @@ const CLS: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const RET: Opcode = Opcode {
+const RET: OpcodeMatcher = OpcodeMatcher {
     pattern: "00EE;RET",
     bitmask: 0xFFFF,
     match_value: 0x00EE,
@@ -50,7 +77,7 @@ const RET: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SYS: Opcode = Opcode {
+const SYS: OpcodeMatcher = OpcodeMatcher {
     pattern: "0nnn;SYS addr",
     bitmask: 0xF000,
     match_value: 0x0000,
@@ -58,7 +85,7 @@ const SYS: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const JP: Opcode = Opcode {
+const JP: OpcodeMatcher = OpcodeMatcher {
     pattern: "1nnn;JP addr",
     bitmask: 0xF000,
     match_value: 0x1000,
@@ -66,7 +93,7 @@ const JP: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const CALL: Opcode = Opcode {
+const CALL: OpcodeMatcher = OpcodeMatcher {
     pattern: "2nnn;CALL addr",
     bitmask: 0xF000,
     match_value: 0x2000,
@@ -74,7 +101,7 @@ const CALL: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SE_VX_BYTE: Opcode = Opcode {
+const SE_VX_BYTE: OpcodeMatcher = OpcodeMatcher {
     pattern: "3xkk;SE Vx, byte",
     bitmask: 0xF000,
     match_value: 0x3000,
@@ -82,7 +109,7 @@ const SE_VX_BYTE: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SNE_VX_KK: Opcode = Opcode {
+const SNE_VX_KK: OpcodeMatcher = OpcodeMatcher {
     pattern: "4xkk;SNE Vx, byte",
     bitmask: 0xF000,
     match_value: 0x4000,
@@ -90,7 +117,7 @@ const SNE_VX_KK: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SE_VX_VY: Opcode = Opcode {
+const SE_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "5xy0;SE Vx, Vy",
     bitmask: 0xF000,
     match_value: 0x5000,
@@ -98,7 +125,7 @@ const SE_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_VX_BYTE: Opcode = Opcode {
+const LD_VX_BYTE: OpcodeMatcher = OpcodeMatcher {
     pattern: "6xkk;LD Vx, byte",
     bitmask: 0xF000,
     match_value: 0x6000,
@@ -106,7 +133,7 @@ const LD_VX_BYTE: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const ADD_VX_BYTE: Opcode = Opcode {
+const ADD_VX_BYTE: OpcodeMatcher = OpcodeMatcher {
     pattern: "7xkk;ADD Vx, byte",
     bitmask: 0xF000,
     match_value: 0x7000,
@@ -114,7 +141,7 @@ const ADD_VX_BYTE: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_VX_VY: Opcode = Opcode {
+const LD_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xy0;LD Vx, Vy",
     bitmask: 0xF00F,
     match_value: 0x8000,
@@ -122,7 +149,7 @@ const LD_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const OR_VX_VY: Opcode = Opcode {
+const OR_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xy1;OR Vx, Vy",
     bitmask: 0xF00F,
     match_value: 0x8001,
@@ -130,7 +157,7 @@ const OR_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const AND_VX_VY: Opcode = Opcode {
+const AND_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xy2;AND Vx, Vy",
     bitmask: 0xF00F,
     match_value: 0x8002,
@@ -138,7 +165,7 @@ const AND_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const XOR_VX_VY: Opcode = Opcode {
+const XOR_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xy3;XOR Vx, Vy",
     bitmask: 0xF00F,
     match_value: 0x8003,
@@ -146,7 +173,7 @@ const XOR_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const ADD_VX_VY: Opcode = Opcode {
+const ADD_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xy4;ADD Vx, Vy",
     bitmask: 0xF00F,
     match_value: 0x8004,
@@ -154,7 +181,7 @@ const ADD_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SUB_VX_VY: Opcode = Opcode {
+const SUB_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xy5;SUB Vx, Vy",
     bitmask: 0xF00F,
     match_value: 0x8005,
@@ -162,7 +189,7 @@ const SUB_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SHR_VX: Opcode = Opcode {
+const SHR_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xy6;SHR Vx",
     bitmask: 0xF00F,
     match_value: 0x8006,
@@ -170,7 +197,7 @@ const SHR_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SUBN_VX_VY: Opcode = Opcode {
+const SUBN_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xy7;SUBN Vx, Vy",
     bitmask: 0xF00F,
     match_value: 0x8007,
@@ -178,7 +205,7 @@ const SUBN_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SHL_VX: Opcode = Opcode {
+const SHL_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "8xyE;SHL Vx",
     bitmask: 0xF00F,
     match_value: 0x800E,
@@ -186,7 +213,7 @@ const SHL_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SNE_VX_VY: Opcode = Opcode {
+const SNE_VX_VY: OpcodeMatcher = OpcodeMatcher {
     pattern: "9xy0;SNE Vx, Vy ",
     bitmask: 0xF00F,
     match_value: 0x9000,
@@ -194,7 +221,7 @@ const SNE_VX_VY: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_I_ADDR: Opcode = Opcode {
+const LD_I_ADDR: OpcodeMatcher = OpcodeMatcher {
     pattern: "Annn;LD I, addr",
     bitmask: 0xF000,
     match_value: 0xA000,
@@ -202,7 +229,7 @@ const LD_I_ADDR: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const JP_V0_ADDR: Opcode = Opcode {
+const JP_V0_ADDR: OpcodeMatcher = OpcodeMatcher {
     pattern: "Bnnn;JP V0, addr",
     bitmask: 0xF000,
     match_value: 0xB000,
@@ -210,7 +237,7 @@ const JP_V0_ADDR: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const RND_VX_BYTE: Opcode = Opcode {
+const RND_VX_BYTE: OpcodeMatcher = OpcodeMatcher {
     pattern: "Cxkk;RND Vx, byte",
     bitmask: 0xF000,
     match_value: 0xC000,
@@ -218,7 +245,7 @@ const RND_VX_BYTE: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const DRW_VX_VY_NB: Opcode = Opcode {
+const DRW_VX_VY_NB: OpcodeMatcher = OpcodeMatcher {
     pattern: "Dxyn;DRW Vx, Vy, nibble",
     bitmask: 0xF000,
     match_value: 0xD000,
@@ -226,7 +253,7 @@ const DRW_VX_VY_NB: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SKP_VX: Opcode = Opcode {
+const SKP_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "Ex9E;SKP Vx",
     bitmask: 0xF0FF,
     match_value: 0xE09E,
@@ -234,7 +261,7 @@ const SKP_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const SKNP_VX: Opcode = Opcode {
+const SKNP_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "ExA1;SKNP Vx",
     bitmask: 0xF0FF,
     match_value: 0xE0A1,
@@ -242,7 +269,7 @@ const SKNP_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_VX_DTIMER: Opcode = Opcode {
+const LD_VX_DTIMER: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx07;LD Vx, DT",
     bitmask: 0xF0FF,
     match_value: 0xF007,
@@ -250,7 +277,7 @@ const LD_VX_DTIMER: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_VX_K: Opcode = Opcode {
+const LD_VX_K: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx0A;LD Vx, K",
     bitmask: 0xF0FF,
     match_value: 0xF00A,
@@ -258,7 +285,7 @@ const LD_VX_K: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_DTIMER_VX: Opcode = Opcode {
+const LD_DTIMER_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx15;LD DT, Vx,",
     bitmask: 0xF0FF,
     match_value: 0xF015,
@@ -266,7 +293,7 @@ const LD_DTIMER_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_STIMER_VX: Opcode = Opcode {
+const LD_STIMER_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx18;LD ST, Vx",
     bitmask: 0xF0FF,
     match_value: 0xF018,
@@ -274,7 +301,7 @@ const LD_STIMER_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const ADD_I_VX: Opcode = Opcode {
+const ADD_I_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx1E;ADD I, Vx",
     bitmask: 0xF0FF,
     match_value: 0xF01E,
@@ -282,7 +309,7 @@ const ADD_I_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_F_VX: Opcode = Opcode {
+const LD_F_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx29;LD I, Vx (hex sprite value)",
     bitmask: 0xF0FF,
     match_value: 0xF029,
@@ -290,7 +317,7 @@ const LD_F_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_BCD_VX: Opcode = Opcode {
+const LD_BCD_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx33;LD [I] (BDC of Vx), Vx",
     bitmask: 0xF0FF,
     match_value: 0xF033,
@@ -298,7 +325,7 @@ const LD_BCD_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_I_VX: Opcode = Opcode {
+const LD_I_VX: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx55;LD [I], V0-Vx",
     bitmask: 0xF0FF,
     match_value: 0xF055,
@@ -306,7 +333,7 @@ const LD_I_VX: Opcode = Opcode {
     pre_ex_dump: dft_pre_ex_dump,
     post_ex_dump: dft_post_ex_dump,
 };
-const LD_VX_I: Opcode = Opcode {
+const LD_VX_I: OpcodeMatcher = OpcodeMatcher {
     pattern: "Fx65;LD V0-Vx, [I]",
     bitmask: 0xF0FF,
     match_value: 0xF065,
@@ -315,7 +342,7 @@ const LD_VX_I: Opcode = Opcode {
     post_ex_dump: dft_post_ex_dump,
 };
 
-pub const OPCODES: [Opcode; CHIP8_TOTAL_STANDARD_OPCODES] = [
+pub const OPCODES: [OpcodeMatcher; CHIP8_TOTAL_STANDARD_OPCODES] = [
     CLS,
     RET,
     SYS,
@@ -353,50 +380,42 @@ pub const OPCODES: [Opcode; CHIP8_TOTAL_STANDARD_OPCODES] = [
     LD_VX_I,
 ];
 
-fn dft_pre_ex_dump(
-    pattern: &'static str,
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) {
-    let mut pre_ex_dump = format!("{:#06X}: {:#06X} /", registers.get_pc(), opcode);
-    let split = pattern.split(";").collect::<Vec<&str>>();
+fn dft_pre_ex_dump(ctx: &VMContext) {
+    let mut pre_ex_dump = format!("{:#06X}: {:#06X} /", ctx.registers.get_pc(), ctx.opcode);
+    let split = ctx.pattern.split(";").collect::<Vec<&str>>();
     let opcode_str = *split.get(0).unwrap();
     let desc = format!(" {} /", *split.get(1).unwrap());
 
     pre_ex_dump.push_str(&desc);
 
     if opcode_str.contains("x") {
-        let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-        let vx_value = registers.get_v_register(vx_index);
+        let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+        let vx_value = ctx.registers.get_v_register(vx_index);
         let vx = format!(" V{:X} = {:#04X}", vx_index, vx_value);
         pre_ex_dump.push_str(&vx);
     }
 
     if opcode_str.contains("y") {
-        let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-        let vy_value = registers.get_v_register(vy_index);
+        let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+        let vy_value = ctx.registers.get_v_register(vy_index);
         let vy = format!(", V{:X} = {:#04X},", vy_index, vy_value);
         pre_ex_dump.push_str(&vy);
     }
 
     if opcode_str.contains("nnn") {
-        let address = opcode & 0x0FFF;
+        let address = ctx.opcode & 0x0FFF;
         let vy = format!(" NNN = {:#05X}", address);
         pre_ex_dump.push_str(&vy);
     }
 
     if opcode_str.ends_with("n") && !opcode_str.ends_with("nnn") {
-        let nbytes = opcode & 0x000F;
+        let nbytes = ctx.opcode & 0x000F;
         let vy = format!(" N = {:#03X}", nbytes);
         pre_ex_dump.push_str(&vy);
     }
 
     if opcode_str.contains("kk") {
-        let byte = opcode & 0x00FF;
+        let byte = ctx.opcode & 0x00FF;
         let vy = format!(" KK = {:#04X}", byte);
         pre_ex_dump.push_str(&vy);
     }
@@ -404,553 +423,333 @@ fn dft_pre_ex_dump(
     println!("{}", pre_ex_dump);
 }
 
-fn dft_post_ex_dump(
-    _pattern: &'static str,
-    _opcode: u16,
-    stack: &mut Stack,
-    memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    screen: &mut Screen,
-) {
-    registers.dump();
-    stack.dump();
-    memory.dump();
-    screen.dump();
-}
-
-pub struct Opcode {
-    pattern: &'static str,
-    bitmask: u16,
-    match_value: u16,
-    instructions: OpcodeInstructions,
-    pre_ex_dump: OpcodeDump,
-    post_ex_dump: OpcodeDump,
-}
-
-impl Opcode {
-    pub fn check(&self, binary_opcode: u16) -> bool {
-        let masked = binary_opcode & self.bitmask;
-        masked == self.match_value
-    }
-
-    pub fn instructions(&self) -> OpcodeInstructions {
-        self.instructions
-    }
-
-    pub fn pre_ex_dump(&self) -> OpcodeDump {
-        self.pre_ex_dump
-    }
-
-    pub fn post_ex_dump(&self) -> OpcodeDump {
-        self.post_ex_dump
-    }
-
-    pub fn pattern(&self) -> &'static str {
-        self.pattern
-    }
+fn dft_post_ex_dump(ctx: &VMContext) {
+    ctx.registers.dump();
+    ctx.stack.dump();
+    ctx.memory.dump();
+    ctx.screen.dump();
 }
 
 // Instructions for opcode pattern 00E0. Clear the display.
-fn sys(
-    _opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
+fn sys(ctx: &mut VMContext) -> Result<Signal, VMError> {
     // This instruction is only used on the old computers on which Chip-8 was originally implemented.
     // It is ignored by modern interpreters.
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 00E0. Clear the display.
-fn cls(
-    _opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    screen.clear()?;
-    registers.inc_pc()?;
+fn cls(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    ctx.screen.clear()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::DrawScreen)
 }
 
 // Instructions for opcode pattern 00EE. Return from subroutine.
-fn ret(
-    _opcode: u16,
-    stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    registers.dec_sp()?;
-    registers.set_pc(stack.get_at(registers.get_sp())?);
+fn ret(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    ctx.registers.dec_sp()?;
+    ctx.registers
+        .set_pc(ctx.stack.get_at(ctx.registers.get_sp())?);
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 1nnn. Jump to location nnn.
-fn jp(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let jump_address = opcode & 0x0FFF;
-    registers.set_pc(jump_address);
+fn jp(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let jump_address = ctx.opcode & 0x0FFF;
+    ctx.registers.set_pc(jump_address);
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 2nnn. Call subroutine at address nnn.
-fn call(
-    opcode: u16,
-    stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    registers.inc_pc()?;
-    stack.set_at(registers.get_sp(), registers.get_pc())?;
-    registers.inc_sp()?;
-    let call_address = opcode & 0x0FFF;
-    registers.set_pc(call_address);
+fn call(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    ctx.registers.inc_pc()?;
+    ctx.stack
+        .set_at(ctx.registers.get_sp(), ctx.registers.get_pc())?;
+    ctx.registers.inc_sp()?;
+    let call_address = ctx.opcode & 0x0FFF;
+    ctx.registers.set_pc(call_address);
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 3xkk. Skip next instruction if Vx = kk.
-fn se_vx_kk(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let kk_value = (opcode & 0x00FF) as u8;
+fn se_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let kk_value = (ctx.opcode & 0x00FF) as u8;
     if vx_value == kk_value {
-        registers.inc_pc()?;
+        ctx.registers.inc_pc()?;
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 4xkk. Skip next instruction if Vx != kk.
-fn sne_vx_kk(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let kk_value: u8 = (opcode & 0x00FF) as u8;
+fn sne_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let kk_value: u8 = (ctx.opcode & 0x00FF) as u8;
     if vx_value != kk_value {
-        registers.inc_pc()?;
+        ctx.registers.inc_pc()?;
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 5xy0. Skip next instruction if Vx = Vy.
-fn se_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let vy_value = registers.get_v_register(vy_index);
+fn se_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vy_value = ctx.registers.get_v_register(vy_index);
     if vx_value == vy_value {
-        registers.inc_pc()?;
+        ctx.registers.inc_pc()?;
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 6xkk. Set Vx = kk.
-fn ld_vx_kk(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let kk_value = (opcode & 0x00FF) as u8;
-    registers.set_v_register(vx_index, kk_value);
-    registers.inc_pc()?;
+fn ld_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let kk_value = (ctx.opcode & 0x00FF) as u8;
+    ctx.registers.set_v_register(vx_index, kk_value);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 7xkk. Set Vx = Vx + kk.
-fn add_vx_kk(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let kk_value = (opcode & 0x00FF) as u8;
-    registers.set_v_register(vx_index, vx_value.wrapping_add(kk_value));
-    registers.inc_pc()?;
+fn add_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let kk_value = (ctx.opcode & 0x00FF) as u8;
+    ctx.registers
+        .set_v_register(vx_index, vx_value.wrapping_add(kk_value));
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xy0. Set Vx = Vy.
-fn ld_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vy_value = registers.get_v_register(vy_index);
-    registers.set_v_register(vx_index, vy_value);
-    registers.inc_pc()?;
+fn ld_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vy_value = ctx.registers.get_v_register(vy_index);
+    ctx.registers.set_v_register(vx_index, vy_value);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xy1. Set Vx = Vx OR Vy.
-fn or_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let vy_value = registers.get_v_register(vy_index);
-    registers.set_v_register(vx_index, vx_value | vy_value);
-    registers.unset_vf();
-    registers.inc_pc()?;
+fn or_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vy_value = ctx.registers.get_v_register(vy_index);
+    ctx.registers.set_v_register(vx_index, vx_value | vy_value);
+    ctx.registers.unset_vf();
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xy2. Set Vx = Vx AND Vy.
-fn and_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let vy_value = registers.get_v_register(vy_index);
-    registers.set_v_register(vx_index, vx_value & vy_value);
-    registers.unset_vf();
-    registers.inc_pc()?;
+fn and_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vy_value = ctx.registers.get_v_register(vy_index);
+    ctx.registers.set_v_register(vx_index, vx_value & vy_value);
+    ctx.registers.unset_vf();
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xy3. Set Vx = Vx OR Vy.
-fn xor_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let vy_value = registers.get_v_register(vy_index);
-    registers.set_v_register(vx_index, vx_value ^ vy_value);
-    registers.unset_vf();
-    registers.inc_pc()?;
+fn xor_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vy_value = ctx.registers.get_v_register(vy_index);
+    ctx.registers.set_v_register(vx_index, vx_value ^ vy_value);
+    ctx.registers.unset_vf();
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xy4. Set Vx = Vx + Vy, with carry.
-fn add_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vx_value = registers.get_v_register(vx_index) as u16;
-    let vy_value = registers.get_v_register(vy_index) as u16;
+fn add_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index) as u16;
+    let vy_value = ctx.registers.get_v_register(vy_index) as u16;
     let addition = vx_value + vy_value;
 
-    registers.unset_vf();
+    ctx.registers.unset_vf();
     if addition > std::u8::MAX as u16 {
-        registers.set_vf();
+        ctx.registers.set_vf();
     }
-    registers.set_v_register(vx_index, addition as u8);
-    registers.inc_pc()?;
+    ctx.registers.set_v_register(vx_index, addition as u8);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xy5. Set Vx = Vx - Vy, set VF = NOT borrow.
-fn sub_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let vy_value = registers.get_v_register(vy_index);
-    registers.unset_vf();
+fn sub_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vy_value = ctx.registers.get_v_register(vy_index);
+    ctx.registers.unset_vf();
     if vx_value > vy_value {
-        registers.set_vf();
+        ctx.registers.set_vf();
     }
-    registers.set_v_register(vx_index, vx_value.wrapping_sub(vy_value));
-    registers.inc_pc()?;
+    ctx.registers
+        .set_v_register(vx_index, vx_value.wrapping_sub(vy_value));
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xy6. Set Vx = Vx SHR 1, (shift right) set VF if truncation occuers.
-fn shr_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    // let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    // let vy_value = registers.get_v_register(vy_index);
+fn shr_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    // let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    // let vy_value = ctx.registers.get_v_register(vy_index);
 
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    registers.set_v_register(vx_index, vx_value >> 1);
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    ctx.registers.set_v_register(vx_index, vx_value >> 1);
 
     let vx_lsb = vx_value & 0b0000_0001;
-    registers.unset_vf();
+    ctx.registers.unset_vf();
     if vx_lsb == 1 {
-        registers.set_vf();
+        ctx.registers.set_vf();
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xy7. Set Vx = Vy - Vx, with carry (if Vy > Vx).
-fn subn_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let vy_value = registers.get_v_register(vy_index);
-    registers.unset_vf();
+fn subn_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vy_value = ctx.registers.get_v_register(vy_index);
+    ctx.registers.unset_vf();
     if vy_value > vx_value {
-        registers.set_vf();
+        ctx.registers.set_vf();
     }
-    registers.set_v_register(vx_index, vy_value.wrapping_sub(vx_value));
-    registers.inc_pc()?;
+    ctx.registers
+        .set_v_register(vx_index, vy_value.wrapping_sub(vx_value));
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 8xyE. Set Vx = Vx SHL 1, (shift right) set VF if truncation occurs.
-fn shl_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    // let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    // let vy_value = registers.get_v_register(vy_index);
+fn shl_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    // let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    // let vy_value = ctx.registers.get_v_register(vy_index);
 
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    registers.set_v_register(vx_index, vx_value << 1);
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    ctx.registers.set_v_register(vx_index, vx_value << 1);
 
     let vx_msb = vx_value & 0b1000_0000;
-    registers.unset_vf();
+    ctx.registers.unset_vf();
     if vx_msb > 0 {
-        registers.set_vf();
+        ctx.registers.set_vf();
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 9xy0. Skip next instruction if Vx != Vy.
-fn sne_vx_vy(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((opcode & 0x00F0) >> 4) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    let vy_value = registers.get_v_register(vy_index);
+fn sne_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vy_value = ctx.registers.get_v_register(vy_index);
     if vx_value != vy_value {
-        registers.inc_pc()?;
+        ctx.registers.inc_pc()?;
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Annn. Set I = nnn.
-fn ld_i_addr(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let nnn_value = opcode & 0x0FFF;
-    registers.set_i(nnn_value);
-    registers.inc_pc()?;
+fn ld_i_addr(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let nnn_value = ctx.opcode & 0x0FFF;
+    ctx.registers.set_i(nnn_value);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Bnnn. Jump to location nnn + V0.
-fn jp_v0_addr(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let jump_address = opcode & 0x0FFF;
-    let offset = registers.get_v_register(0) as u16;
-    registers.set_pc(jump_address + offset);
+fn jp_v0_addr(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let jump_address = ctx.opcode & 0x0FFF;
+    let offset = ctx.registers.get_v_register(0) as u16;
+    ctx.registers.set_pc(jump_address + offset);
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Cxkk. Set Vx = random byte AND kk.
-fn rnd_vx_byte(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let kk_value = (opcode & 0x00FF) as u8;
+fn rnd_vx_byte(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let kk_value = (ctx.opcode & 0x00FF) as u8;
     let rnd = rand::random::<u8>();
-    registers.set_v_register(vx_index, rnd & kk_value);
-    registers.inc_pc()?;
+    ctx.registers.set_v_register(vx_index, rnd & kk_value);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 /// Instructions for opcode pattern Dxyn. Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
-fn drw_vx_vy_nb(
-    opcode: u16,
-    _stack: &mut Stack,
-    memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_value = registers.get_v_register(((opcode & 0x0F00) >> 8) as usize);
-    let vy_value = registers.get_v_register(((opcode & 0x00F0) >> 4) as usize);
-    let nbytes = (opcode & 0x000F) as usize;
-    let offset = registers.get_i();
-    registers.unset_vf();
-    if screen.draw_sprite(
+fn drw_vx_vy_nb(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_value = ctx
+        .registers
+        .get_v_register(((ctx.opcode & 0x0F00) >> 8) as usize);
+    let vy_value = ctx
+        .registers
+        .get_v_register(((ctx.opcode & 0x00F0) >> 4) as usize);
+    let nbytes = (ctx.opcode & 0x000F) as usize;
+    let offset = ctx.registers.get_i();
+    ctx.registers.unset_vf();
+    if ctx.screen.draw_sprite(
         vx_value as usize,
         vy_value as usize,
         offset as usize,
-        memory,
+        ctx.memory,
         nbytes,
     )? {
-        registers.set_vf();
+        ctx.registers.set_vf();
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::DrawScreen)
 }
 
 // Instructions for opcode pattern Ex9E. Skip next instruction if key with the value of Vx is pressed.
-fn skp_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    if keyboard.is_key_down(vx_value) {
-        registers.inc_pc()?;
+fn skp_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    if ctx.keyboard.is_key_down(vx_value) {
+        ctx.registers.inc_pc()?;
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Ex9E. Skip next instruction if key with the value of Vx is not pressed.
-fn sknp_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    if keyboard.is_key_up(vx_value) {
-        registers.inc_pc()?;
+fn sknp_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    if ctx.keyboard.is_key_up(vx_value) {
+        ctx.registers.inc_pc()?;
     }
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Fx07. Set Vx = delay timer value.
-fn ld_vx_dt(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let delay_timer = registers.get_dt();
-    registers.set_v_register(vx_index, delay_timer);
-    registers.inc_pc()?;
+fn ld_vx_dt(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let delay_timer = ctx.registers.get_dt();
+    ctx.registers.set_v_register(vx_index, delay_timer);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
@@ -959,28 +758,22 @@ thread_local! {
 }
 
 // Instructions for opcode pattern Fx0A. Wait for a key press, store the value fo the key in Vx.
-fn ld_vx_key(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
+fn ld_vx_key(ctx: &mut VMContext) -> Result<Signal, VMError> {
     WAIT_KEYUP.with(|f| {
         let mut signal = Ok(Signal::NoSignal);
         match f.get() {
             Some(key) => {
-                if keyboard.is_key_up(key) {
-                    registers.set_v_register(((opcode & 0x0F00) >> 8) as usize, key);
-                    registers.inc_pc()?;
+                if ctx.keyboard.is_key_up(key) {
+                    ctx.registers
+                        .set_v_register(((ctx.opcode & 0x0F00) >> 8) as usize, key);
+                    ctx.registers.inc_pc()?;
                     f.set(None);
                 }
             }
             None => {
                 // check for key down through all keys
                 for key in 0x0..=0xF as u8 {
-                    if keyboard.is_key_down(key) {
+                    if ctx.keyboard.is_key_down(key) {
                         signal = Ok(Signal::WaitKeyUp(key));
                         f.set(Some(key));
                     }
@@ -992,81 +785,46 @@ fn ld_vx_key(
 }
 
 // Instructions for opcode pattern Fx15. Set delay timer = Vx.
-fn ld_dt_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    registers.set_dt(vx_value);
-    registers.inc_pc()?;
+fn ld_dt_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    ctx.registers.set_dt(vx_value);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Fx18. Set sound timer = Vx.
-fn ld_st_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
-    registers.set_st(vx_value);
-    registers.inc_pc()?;
+fn ld_st_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
+    ctx.registers.set_st(vx_value);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Fx1E. Set I = I + Vx.
-fn add_i_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index) as u16;
-    registers.set_i(registers.get_i() + vx_value);
-    registers.inc_pc()?;
+fn add_i_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index) as u16;
+    ctx.registers.set_i(ctx.registers.get_i() + vx_value);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Fx29. Set I = location of sprite for digit Vx.
-fn ld_f_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    _memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
+fn ld_f_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
     let char_addr = vx_value * 5;
-    registers.set_i(char_addr as u16);
-    registers.inc_pc()?;
+    ctx.registers.set_i(char_addr as u16);
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Fx33. Store BCD representation of Vx in memory locations I, I+1, +2.
-fn ld_bcd_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let vx_value = registers.get_v_register(vx_index);
+fn ld_bcd_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_value = ctx.registers.get_v_register(vx_index);
 
     // Bitmasks for BCD units
     let ones_mask = 0x000000F00;
@@ -1114,56 +872,43 @@ fn ld_bcd_vx(
     }
 
     // Store BCD in memory: hundreds at I, tens at I+1, ones at I+2.
-    let addr = registers.get_i() as usize;
+    let addr = ctx.registers.get_i() as usize;
     for (offset, unit) in [hund as u8, tens as u8, ones as u8].into_iter().enumerate() {
-        memory.set(addr + offset, unit)?;
+        ctx.memory.set(addr + offset, unit)?;
     }
 
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Fx55. Store registers V0 through Vx in memory starting at location I.
-fn ld_i_vx(
-    opcode: u16,
-    _stack: &mut Stack,
-    memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let base_addr = registers.get_i() as usize;
+fn ld_i_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let base_addr = ctx.registers.get_i() as usize;
 
     for vx in 0..=vx_index {
-        memory.set(base_addr + vx, registers.get_v_register(vx))?;
-        registers.inc_i();
+        ctx.memory
+            .set(base_addr + vx, ctx.registers.get_v_register(vx))?;
+        ctx.registers.inc_i();
     }
-    registers.inc_i();
+    ctx.registers.inc_i();
 
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Fx65. Read registers V0 through Vx from memory starting at location I.
-fn ld_vx_i(
-    opcode: u16,
-    _stack: &mut Stack,
-    memory: &mut RAM,
-    registers: &mut Registers,
-    _keyboard: &Keyboard,
-    _screen: &mut Screen,
-) -> Result<Signal, VMError> {
-    let vx_index = ((opcode & 0x0F00) >> 8) as usize;
-    let base_addr = registers.get_i() as usize;
+fn ld_vx_i(ctx: &mut VMContext) -> Result<Signal, VMError> {
+    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let base_addr = ctx.registers.get_i() as usize;
 
     for vx in 0..=vx_index {
-        let value = memory.get(base_addr + vx)?;
-        registers.set_v_register(vx, value);
-        registers.inc_i();
+        let value = ctx.memory.get(base_addr + vx)?;
+        ctx.registers.set_v_register(vx, value);
+        ctx.registers.inc_i();
     }
-    registers.inc_i();
+    ctx.registers.inc_i();
 
-    registers.inc_pc()?;
+    ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }

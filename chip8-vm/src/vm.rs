@@ -1,6 +1,6 @@
 use crate::{
     config::CHIP8_PROGRAM_LOAD_ADDRESS,
-    cpu::{Registers, Stack, OPCODES},
+    cpu::{Registers, Stack, VMContext, OPCODES},
     errors::VMError,
     io::{Keyboard, Screen},
     memory::RAM,
@@ -142,38 +142,21 @@ impl VM {
         time_acc: &mut u32,
     ) -> Result<Signal, VMError> {
         let time_per_delay = 60; // miliseconds
-        for opcode in OPCODES {
-            if opcode.check(binary_opcode) {
+        for opcode_matcher in OPCODES {
+            if opcode_matcher.check_matching(binary_opcode) {
+                let mut ctx = self.build_vmcontext(binary_opcode, opcode_matcher.pattern());
+
                 if debug_dump {
-                    opcode.pre_ex_dump()(
-                        opcode.pattern(),
-                        binary_opcode,
-                        &mut self.stack,
-                        &mut self.memory,
-                        &mut self.registers,
-                        &self.keyboard,
-                        &mut self.screen,
-                    );
+                    opcode_matcher.pre_ex_dump()(&ctx);
                 }
-                let signal = opcode.instructions()(
-                    binary_opcode,
-                    &mut self.stack,
-                    &mut self.memory,
-                    &mut self.registers,
-                    &self.keyboard,
-                    &mut self.screen,
-                )?;
+
+                // Execute Opcode instructions
+                let signal = opcode_matcher.instructions()(&mut ctx)?;
+
                 if debug_dump {
-                    opcode.post_ex_dump()(
-                        opcode.pattern(),
-                        binary_opcode,
-                        &mut self.stack,
-                        &mut self.memory,
-                        &mut self.registers,
-                        &self.keyboard,
-                        &mut self.screen,
-                    );
+                    opcode_matcher.post_ex_dump()(&ctx);
                 }
+
                 // Update timers
                 if *time_acc > time_per_delay {
                     if self.registers_dt() > 0 {
@@ -188,6 +171,18 @@ impl VM {
             }
         }
         Err(VMError::InvalidOpcode(binary_opcode))
+    }
+
+    fn build_vmcontext<'a>(&'a mut self, binary_opcode: u16, pattern: &'a str) -> VMContext<'a> {
+        VMContext {
+            opcode: binary_opcode,
+            stack: &mut self.stack,
+            memory: &mut self.memory,
+            registers: &mut self.registers,
+            keyboard: &self.keyboard,
+            screen: &mut self.screen,
+            pattern: pattern,
+        }
     }
 }
 
