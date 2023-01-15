@@ -144,7 +144,7 @@ impl VM {
         let time_per_delay = 60; // miliseconds
         for opcode_matcher in OPCODES {
             if opcode_matcher.check_matching(binary_opcode) {
-                let mut ctx = self.build_vmcontext(binary_opcode, opcode_matcher.pattern());
+                let mut ctx = self.build_vmcontext(binary_opcode, opcode_matcher.desc());
 
                 if debug_dump {
                     opcode_matcher.pre_ex_dump()(&ctx);
