@@ -9,6 +9,50 @@ use crate::{
 
 use super::{Registers, Stack};
 
+macro_rules! vx_index {
+    ($ctx:ident) => {
+        (($ctx.opcode & 0x0F00) >> 8) as usize
+    };
+}
+
+macro_rules! vx_value {
+    ($ctx:ident) => {{
+        let vx_index = vx_index!($ctx);
+        $ctx.registers.get_v_register(vx_index)
+    }};
+}
+
+macro_rules! vy_index {
+    ($ctx:ident) => {
+        (($ctx.opcode & 0x00F0) >> 4) as usize
+    };
+}
+
+macro_rules! vy_value {
+    ($ctx:ident) => {{
+        let vy_index = vy_index!($ctx);
+        $ctx.registers.get_v_register(vy_index)
+    }};
+}
+
+macro_rules! kk_value {
+    ($ctx:ident) => {
+        ($ctx.opcode & 0x00FF) as u8
+    };
+}
+
+macro_rules! nnn_value {
+    ($ctx:ident) => {
+        ($ctx.opcode & 0x0FFF) as u16
+    };
+}
+
+macro_rules! nbytes_value {
+    ($ctx:ident) => {
+        ($ctx.opcode & 0x000F) as usize
+    };
+}
+
 pub enum Signal {
     NoSignal,
     DrawScreen,
@@ -389,33 +433,33 @@ fn dft_pre_ex_dump(ctx: &VMContext) {
     pre_ex_dump.push_str(&desc);
 
     if opcode_str.contains("x") {
-        let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-        let vx_value = ctx.registers.get_v_register(vx_index);
+        let vx_index = vx_index!(ctx);
+        let vx_value = vx_value!(ctx);
         let vx = format!(" V{:X} = {:#04X}", vx_index, vx_value);
         pre_ex_dump.push_str(&vx);
     }
 
     if opcode_str.contains("y") {
-        let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-        let vy_value = ctx.registers.get_v_register(vy_index);
+        let vy_index = vy_index!(ctx);
+        let vy_value = vy_value!(ctx);
         let vy = format!(", V{:X} = {:#04X},", vy_index, vy_value);
         pre_ex_dump.push_str(&vy);
     }
 
     if opcode_str.contains("nnn") {
-        let address = ctx.opcode & 0x0FFF;
+        let address = nnn_value!(ctx);
         let vy = format!(" NNN = {:#05X}", address);
         pre_ex_dump.push_str(&vy);
     }
 
     if opcode_str.ends_with("n") && !opcode_str.ends_with("nnn") {
-        let nbytes = ctx.opcode & 0x000F;
+        let nbytes = nbytes_value!(ctx);
         let vy = format!(" N = {:#03X}", nbytes);
         pre_ex_dump.push_str(&vy);
     }
 
     if opcode_str.contains("kk") {
-        let byte = ctx.opcode & 0x00FF;
+        let byte = kk_value!(ctx);
         let vy = format!(" KK = {:#04X}", byte);
         pre_ex_dump.push_str(&vy);
     }
@@ -455,7 +499,7 @@ fn ret(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 1nnn. Jump to location nnn.
 fn jp(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let jump_address = ctx.opcode & 0x0FFF;
+    let jump_address = nnn_value!(ctx);
     ctx.registers.set_pc(jump_address);
     Ok(Signal::NoSignal)
 }
@@ -466,16 +510,15 @@ fn call(ctx: &mut VMContext) -> Result<Signal, VMError> {
     ctx.stack
         .set_at(ctx.registers.get_sp(), ctx.registers.get_pc())?;
     ctx.registers.inc_sp()?;
-    let call_address = ctx.opcode & 0x0FFF;
+    let call_address = nnn_value!(ctx);
     ctx.registers.set_pc(call_address);
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern 3xkk. Skip next instruction if Vx = kk.
 fn se_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let kk_value = (ctx.opcode & 0x00FF) as u8;
+    let vx_value = vx_value!(ctx);
+    let kk_value = kk_value!(ctx);
     if vx_value == kk_value {
         ctx.registers.inc_pc()?;
     }
@@ -485,9 +528,8 @@ fn se_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 4xkk. Skip next instruction if Vx != kk.
 fn sne_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let kk_value: u8 = (ctx.opcode & 0x00FF) as u8;
+    let vx_value = vx_value!(ctx);
+    let kk_value: u8 = kk_value!(ctx);
     if vx_value != kk_value {
         ctx.registers.inc_pc()?;
     }
@@ -497,10 +539,8 @@ fn sne_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 5xy0. Skip next instruction if Vx = Vy.
 fn se_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let vy_value = ctx.registers.get_v_register(vy_index);
+    let vx_value = vx_value!(ctx);
+    let vy_value = vy_value!(ctx);
     if vx_value == vy_value {
         ctx.registers.inc_pc()?;
     }
@@ -510,8 +550,8 @@ fn se_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 6xkk. Set Vx = kk.
 fn ld_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let kk_value = (ctx.opcode & 0x00FF) as u8;
+    let vx_index = vx_index!(ctx);
+    let kk_value = kk_value!(ctx);
     ctx.registers.set_v_register(vx_index, kk_value);
     ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
@@ -519,9 +559,9 @@ fn ld_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 7xkk. Set Vx = Vx + kk.
 fn add_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let kk_value = (ctx.opcode & 0x00FF) as u8;
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx);
+    let kk_value = kk_value!(ctx);
     ctx.registers
         .set_v_register(vx_index, vx_value.wrapping_add(kk_value));
     ctx.registers.inc_pc()?;
@@ -530,9 +570,8 @@ fn add_vx_kk(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 8xy0. Set Vx = Vy.
 fn ld_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vy_value = ctx.registers.get_v_register(vy_index);
+    let vx_index = vx_index!(ctx);
+    let vy_value = vy_value!(ctx);
     ctx.registers.set_v_register(vx_index, vy_value);
     ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
@@ -540,10 +579,9 @@ fn ld_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 8xy1. Set Vx = Vx OR Vy.
 fn or_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let vy_value = ctx.registers.get_v_register(vy_index);
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx);
+    let vy_value = vy_value!(ctx);
     ctx.registers.set_v_register(vx_index, vx_value | vy_value);
     ctx.registers.unset_vf();
     ctx.registers.inc_pc()?;
@@ -552,10 +590,9 @@ fn or_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 8xy2. Set Vx = Vx AND Vy.
 fn and_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let vy_value = ctx.registers.get_v_register(vy_index);
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx);
+    let vy_value = vy_value!(ctx);
     ctx.registers.set_v_register(vx_index, vx_value & vy_value);
     ctx.registers.unset_vf();
     ctx.registers.inc_pc()?;
@@ -564,10 +601,9 @@ fn and_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 8xy3. Set Vx = Vx OR Vy.
 fn xor_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let vy_value = ctx.registers.get_v_register(vy_index);
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx);
+    let vy_value = vy_value!(ctx);
     ctx.registers.set_v_register(vx_index, vx_value ^ vy_value);
     ctx.registers.unset_vf();
     ctx.registers.inc_pc()?;
@@ -576,10 +612,9 @@ fn xor_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 8xy4. Set Vx = Vx + Vy, with carry.
 fn add_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index) as u16;
-    let vy_value = ctx.registers.get_v_register(vy_index) as u16;
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx) as u16;
+    let vy_value = vy_value!(ctx) as u16;
     let addition = vx_value + vy_value;
 
     ctx.registers.unset_vf();
@@ -593,10 +628,9 @@ fn add_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 8xy5. Set Vx = Vx - Vy, set VF = NOT borrow.
 fn sub_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let vy_value = ctx.registers.get_v_register(vy_index);
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx);
+    let vy_value = vy_value!(ctx);
     ctx.registers.unset_vf();
     if vx_value > vy_value {
         ctx.registers.set_vf();
@@ -607,13 +641,13 @@ fn sub_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
     Ok(Signal::NoSignal)
 }
 
-// Instructions for opcode pattern 8xy6. Set Vx = Vx SHR 1, (shift right) set VF if truncation occuers.
+// Instructions for opcode pattern 8xy6. Set Vx = Vx SHR 1, (shift right) set VF if truncation occurs.
 fn shr_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
     // let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
     // let vy_value = ctx.registers.get_v_register(vy_index);
 
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx);
     ctx.registers.set_v_register(vx_index, vx_value >> 1);
 
     let vx_lsb = vx_value & 0b0000_0001;
@@ -627,10 +661,9 @@ fn shr_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 8xy7. Set Vx = Vy - Vx, with carry (if Vy > Vx).
 fn subn_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let vy_value = ctx.registers.get_v_register(vy_index);
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx);
+    let vy_value = vy_value!(ctx);
     ctx.registers.unset_vf();
     if vy_value > vx_value {
         ctx.registers.set_vf();
@@ -646,8 +679,8 @@ fn shl_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
     // let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
     // let vy_value = ctx.registers.get_v_register(vy_index);
 
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vx_index = vx_index!(ctx);
+    let vx_value = vx_value!(ctx);
     ctx.registers.set_v_register(vx_index, vx_value << 1);
 
     let vx_msb = vx_value & 0b1000_0000;
@@ -661,10 +694,8 @@ fn shl_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern 9xy0. Skip next instruction if Vx != Vy.
 fn sne_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vy_index = ((ctx.opcode & 0x00F0) >> 4) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
-    let vy_value = ctx.registers.get_v_register(vy_index);
+    let vx_value = vx_value!(ctx);
+    let vy_value = vy_value!(ctx);
     if vx_value != vy_value {
         ctx.registers.inc_pc()?;
     }
@@ -674,7 +705,7 @@ fn sne_vx_vy(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Annn. Set I = nnn.
 fn ld_i_addr(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let nnn_value = ctx.opcode & 0x0FFF;
+    let nnn_value = nnn_value!(ctx);
     ctx.registers.set_i(nnn_value);
     ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
@@ -682,7 +713,7 @@ fn ld_i_addr(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Bnnn. Jump to location nnn + V0.
 fn jp_v0_addr(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let jump_address = ctx.opcode & 0x0FFF;
+    let jump_address = nnn_value!(ctx);
     let offset = ctx.registers.get_v_register(0) as u16;
     ctx.registers.set_pc(jump_address + offset);
     Ok(Signal::NoSignal)
@@ -690,8 +721,8 @@ fn jp_v0_addr(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Cxkk. Set Vx = random byte AND kk.
 fn rnd_vx_byte(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let kk_value = (ctx.opcode & 0x00FF) as u8;
+    let vx_index = vx_index!(ctx);
+    let kk_value = kk_value!(ctx);
     let rnd = rand::random::<u8>();
     ctx.registers.set_v_register(vx_index, rnd & kk_value);
     ctx.registers.inc_pc()?;
@@ -700,13 +731,9 @@ fn rnd_vx_byte(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 /// Instructions for opcode pattern Dxyn. Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
 fn drw_vx_vy_nb(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_value = ctx
-        .registers
-        .get_v_register(((ctx.opcode & 0x0F00) >> 8) as usize);
-    let vy_value = ctx
-        .registers
-        .get_v_register(((ctx.opcode & 0x00F0) >> 4) as usize);
-    let nbytes = (ctx.opcode & 0x000F) as usize;
+    let vx_value = vx_value!(ctx);
+    let vy_value = vy_value!(ctx);
+    let nbytes = nbytes_value!(ctx);
     let offset = ctx.registers.get_i();
     ctx.registers.unset_vf();
     if ctx.screen.draw_sprite(
@@ -724,8 +751,7 @@ fn drw_vx_vy_nb(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Ex9E. Skip next instruction if key with the value of Vx is pressed.
 fn skp_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vx_value = vx_value!(ctx);
     if ctx.keyboard.is_key_down(vx_value) {
         ctx.registers.inc_pc()?;
     }
@@ -735,8 +761,7 @@ fn skp_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Ex9E. Skip next instruction if key with the value of Vx is not pressed.
 fn sknp_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vx_value = vx_value!(ctx);
     if ctx.keyboard.is_key_up(vx_value) {
         ctx.registers.inc_pc()?;
     }
@@ -746,7 +771,7 @@ fn sknp_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Fx07. Set Vx = delay timer value.
 fn ld_vx_dt(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_index = vx_index!(ctx);
     let delay_timer = ctx.registers.get_dt();
     ctx.registers.set_v_register(vx_index, delay_timer);
     ctx.registers.inc_pc()?;
@@ -764,8 +789,8 @@ fn ld_vx_key(ctx: &mut VMContext) -> Result<Signal, VMError> {
         match f.get() {
             Some(key) => {
                 if ctx.keyboard.is_key_up(key) {
-                    ctx.registers
-                        .set_v_register(((ctx.opcode & 0x0F00) >> 8) as usize, key);
+                    let vx_index = vx_index!(ctx);
+                    ctx.registers.set_v_register(vx_index, key);
                     ctx.registers.inc_pc()?;
                     f.set(None);
                 }
@@ -786,8 +811,7 @@ fn ld_vx_key(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Fx15. Set delay timer = Vx.
 fn ld_dt_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vx_value = vx_value!(ctx);
     ctx.registers.set_dt(vx_value);
     ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
@@ -795,8 +819,7 @@ fn ld_dt_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Fx18. Set sound timer = Vx.
 fn ld_st_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vx_value = vx_value!(ctx);
     ctx.registers.set_st(vx_value);
     ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
@@ -804,17 +827,15 @@ fn ld_st_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Fx1E. Set I = I + Vx.
 fn add_i_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index) as u16;
-    ctx.registers.set_i(ctx.registers.get_i() + vx_value);
+    let vx_value = vx_value!(ctx);
+    ctx.registers.set_i(ctx.registers.get_i() + vx_value as u16);
     ctx.registers.inc_pc()?;
     Ok(Signal::NoSignal)
 }
 
 // Instructions for opcode pattern Fx29. Set I = location of sprite for digit Vx.
 fn ld_f_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vx_value = vx_value!(ctx);
     let char_addr = vx_value * 5;
     ctx.registers.set_i(char_addr as u16);
     ctx.registers.inc_pc()?;
@@ -823,8 +844,7 @@ fn ld_f_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Fx33. Store BCD representation of Vx in memory locations I, I+1, +2.
 fn ld_bcd_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
-    let vx_value = ctx.registers.get_v_register(vx_index);
+    let vx_value = vx_value!(ctx);
 
     // Bitmasks for BCD units
     let ones_mask = 0x000000F00;
@@ -883,7 +903,7 @@ fn ld_bcd_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Fx55. Store registers V0 through Vx in memory starting at location I.
 fn ld_i_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_index = vx_index!(ctx);
     let base_addr = ctx.registers.get_i() as usize;
 
     for vx in 0..=vx_index {
@@ -899,7 +919,7 @@ fn ld_i_vx(ctx: &mut VMContext) -> Result<Signal, VMError> {
 
 // Instructions for opcode pattern Fx65. Read registers V0 through Vx from memory starting at location I.
 fn ld_vx_i(ctx: &mut VMContext) -> Result<Signal, VMError> {
-    let vx_index = ((ctx.opcode & 0x0F00) >> 8) as usize;
+    let vx_index = vx_index!(ctx);
     let base_addr = ctx.registers.get_i() as usize;
 
     for vx in 0..=vx_index {
