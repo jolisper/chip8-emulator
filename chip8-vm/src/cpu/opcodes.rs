@@ -9,12 +9,14 @@ use crate::{
 
 use super::{Registers, Stack};
 
+/// Get the Vx index (0x0x00) from the opcode.
 macro_rules! vx_index {
     ($ctx:ident) => {
         (($ctx.opcode & 0x0F00) >> 8) as usize
     };
 }
 
+/// Get the value from the Vx register (0x0x00).
 macro_rules! vx_value {
     ($ctx:ident) => {{
         let vx_index = vx_index!($ctx);
@@ -22,12 +24,14 @@ macro_rules! vx_value {
     }};
 }
 
+/// Get the Vy index (0x00y0) from the opcode.
 macro_rules! vy_index {
     ($ctx:ident) => {
         (($ctx.opcode & 0x00F0) >> 4) as usize
     };
 }
 
+/// Get the value from the Vy register (0x00y0).
 macro_rules! vy_value {
     ($ctx:ident) => {{
         let vy_index = vy_index!($ctx);
@@ -35,30 +39,37 @@ macro_rules! vy_value {
     }};
 }
 
+/// Get the KK value (0x00KK) from the opcode.
 macro_rules! kk_value {
     ($ctx:ident) => {
         ($ctx.opcode & 0x00FF) as u8
     };
 }
 
+/// Get the NNN value (0x0NNN) from the opcode.
 macro_rules! nnn_value {
     ($ctx:ident) => {
         ($ctx.opcode & 0x0FFF) as u16
     };
 }
 
+/// Get the NBytes value (0x000N) from the opcode.
 macro_rules! nbytes_value {
     ($ctx:ident) => {
         ($ctx.opcode & 0x000F) as usize
     };
 }
 
+/// `Signal` is the return type used by instruction functions of an opcode to signal the VM
+/// front-end what behaviour is expected after the instructions execution.
 pub enum Signal {
     NoSignal,
     DrawScreen,
     WaitKeyUp(u8),
 }
 
+/// The `VMContext` represent the current state of the VM that the instructions of an opcode
+/// take as starting point of its own execution.
 pub struct VMContext<'a> {
     pub opcode: u16,
     pub stack: &'a mut Stack,
@@ -69,17 +80,21 @@ pub struct VMContext<'a> {
     pub pattern: &'a str,
 }
 
+/// Opcode instructions function signature.
 type OpcodeInstructions = fn(cxt: &mut VMContext) -> Result<Signal, VMError>;
 
+/// Opcode dump function signature.
 type OpcodeDump = fn(ctx: &VMContext);
 
+/// The `OpcodeMatcher` holds a mapping between the matching info for a binary opcode and the 
+/// opcode instructions. Also holds the debugging functions for the opcode.
 pub struct OpcodeMatcher {
-    desc: &'static str,
     bitmask: u16,
     match_value: u16,
     instructions: OpcodeInstructions,
     pre_ex_dump: OpcodeDump,
     post_ex_dump: OpcodeDump,
+    desc: &'static str,
 }
 
 impl OpcodeMatcher {
@@ -105,6 +120,7 @@ impl OpcodeMatcher {
     }
 }
 
+/// Opcode matchers constant table, sets the configuration for each of the matchers.
 #[rustfmt::skip] const CLS:          OpcodeMatcher = OpcodeMatcher { bitmask: 0xFFFF, match_value: 0x00E0, instructions: cls,          pre_ex_dump: dft_pre_ex_dump, post_ex_dump: dft_post_ex_dump, desc: "00E0;CLS",                         };
 #[rustfmt::skip] const RET:          OpcodeMatcher = OpcodeMatcher { bitmask: 0xFFFF, match_value: 0x00EE, instructions: ret,          pre_ex_dump: dft_pre_ex_dump, post_ex_dump: dft_post_ex_dump, desc: "00EE;RET",                         };
 #[rustfmt::skip] const SYS:          OpcodeMatcher = OpcodeMatcher { bitmask: 0xF000, match_value: 0x0000, instructions: sys,          pre_ex_dump: dft_pre_ex_dump, post_ex_dump: dft_post_ex_dump, desc: "0nnn;SYS addr",                    };
@@ -141,6 +157,7 @@ impl OpcodeMatcher {
 #[rustfmt::skip] const LD_I_VX:      OpcodeMatcher = OpcodeMatcher { bitmask: 0xF0FF, match_value: 0xF055, instructions: ld_i_vx,      pre_ex_dump: dft_pre_ex_dump, post_ex_dump: dft_post_ex_dump, desc: "Fx55;LD [I], V0-Vx",               };
 #[rustfmt::skip] const LD_VX_I:      OpcodeMatcher = OpcodeMatcher { bitmask: 0xF0FF, match_value: 0xF065, instructions: ld_vx_i,      pre_ex_dump: dft_pre_ex_dump, post_ex_dump: dft_post_ex_dump, desc: "Fx65;LD V0-Vx, [I]",               };
 
+// Constant list of opcodes matchers.
 pub const OPCODES: [OpcodeMatcher; CHIP8_TOTAL_STANDARD_OPCODES] = [
     CLS,
     RET,
@@ -179,6 +196,7 @@ pub const OPCODES: [OpcodeMatcher; CHIP8_TOTAL_STANDARD_OPCODES] = [
     LD_VX_I,
 ];
 
+/// Default pre instructions execution dump function.
 fn dft_pre_ex_dump(ctx: &VMContext) {
     let mut pre_ex_dump = format!("{:#06X}: {:#06X} /", ctx.registers.get_pc(), ctx.opcode);
     let split = ctx.pattern.split(";").collect::<Vec<&str>>();
@@ -222,6 +240,7 @@ fn dft_pre_ex_dump(ctx: &VMContext) {
     println!("{}", pre_ex_dump);
 }
 
+/// Default post instructions execution dump function.
 fn dft_post_ex_dump(ctx: &VMContext) {
     ctx.registers.dump();
     ctx.stack.dump();
@@ -484,7 +503,7 @@ fn rnd_vx_byte(ctx: &mut VMContext) -> Result<Signal, VMError> {
     Ok(Signal::NoSignal)
 }
 
-//// Instructions for opcode pattern Dxyn. Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+/// Instructions for opcode pattern Dxyn. Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
 fn drw_vx_vy_nb(ctx: &mut VMContext) -> Result<Signal, VMError> {
     let vx_value = vx_value!(ctx);
     let vy_value = vy_value!(ctx);
