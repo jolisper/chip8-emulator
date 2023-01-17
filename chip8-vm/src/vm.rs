@@ -22,33 +22,10 @@ impl VM {
         VM::default()
     }
 
-    pub fn memory_set(&mut self, index: usize, value: u8) -> Result<(), VMError> {
-        self.memory.set(index, value)
-    }
-
-    pub fn memory_get(&self, index: usize) -> Result<u8, VMError> {
-        self.memory.get(index)
-    }
-
-    pub fn memory_get_ref(&mut self, index: usize) -> Result<&[u8], VMError> {
-        let memref = self.memory.get_ref(index);
-        Ok(memref)
-    }
-
-    pub fn memory_get_opcode(&self) -> Result<u16, VMError> {
-        self.memory.get_opcode(self.registers.get_pc() as usize)
-    }
-
-    pub fn stack_push(&mut self, value: u16) -> Result<(), VMError> {
-        self.registers.inc_sp()?;
-        self.stack.set_at(self.registers.get_sp() - 1, value)?;
+    pub fn load_program(&mut self, buf: &[u8]) -> Result<(), VMError> {
+        self.memory.load_program(buf)?;
+        self.registers.set_pc(CHIP8_PROGRAM_LOAD_ADDRESS as u16);
         Ok(())
-    }
-
-    pub fn stack_pop(&mut self) -> Result<u16, VMError> {
-        self.registers.dec_sp()?;
-        let value = self.stack.get_at(self.registers.get_sp())?;
-        Ok(value)
     }
 
     pub fn keyboard_key_down(&mut self, key: i32, keymap: &[(i32, usize)]) {
@@ -59,71 +36,16 @@ impl VM {
         self.keyboard.key_up(key, keymap)
     }
 
-    pub fn keyboard_is_key_down(&mut self, key: u8) -> bool {
-        self.keyboard.is_key_down(key)
-    }
-
-    pub fn keyboard_map_to_vkey(
-        &mut self,
-        key: i32,
-        keymap: &[(i32, usize)],
-    ) -> Result<usize, VMError> {
-        self.keyboard.map_to_vkey(key, keymap)
-    }
-
     pub fn screen_is_pixel_set(&mut self, x: usize, y: usize) -> Result<bool, VMError> {
         self.screen.is_pixel_set(x, y)
-    }
-
-    pub fn screen_set_pixel(&mut self, x: usize, y: usize) -> Result<(), VMError> {
-        self.screen.set_pixel(x, y)
-    }
-
-    pub fn screen_draw_sprite(
-        &mut self,
-        x: usize,
-        y: usize,
-        offset: usize,
-        sprite_bytes: u32,
-    ) -> Result<bool, VMError> {
-        let pixel_collision =
-            self.screen
-                .draw_sprite(x, y, offset, &self.memory, sprite_bytes as usize);
-        pixel_collision
-    }
-
-    pub fn registers_set_dt(&mut self, value: u8) {
-        self.registers.dt = value;
     }
 
     pub fn registers_dt(&mut self) -> u8 {
         self.registers.dt
     }
 
-    pub fn registers_dec_dt(&mut self) {
-        self.registers.dec_dt();
-    }
-
-    pub fn registers_set_st(&mut self, value: u8) {
-        self.registers.st = value;
-    }
-
     pub fn registers_st(&mut self) -> u8 {
         self.registers.st
-    }
-
-    pub fn registers_dec_st(&mut self) {
-        self.registers.dec_st();
-    }
-
-    pub fn registers_get_v(&self, index: usize) -> u8 {
-        self.registers.get_v_register(index)
-    }
-
-    pub fn load_program(&mut self, buf: &[u8]) -> Result<(), VMError> {
-        self.memory.load_program(buf)?;
-        self.registers.set_pc(CHIP8_PROGRAM_LOAD_ADDRESS as u16);
-        Ok(())
     }
 
     pub fn exec_next_opcode(
@@ -135,7 +57,7 @@ impl VM {
         self.exec_opcode(binary_opcode, debug_dump, time_acc)
     }
 
-    pub fn exec_opcode(
+    fn exec_opcode(
         &mut self,
         binary_opcode: u16,
         debug_dump: bool,
@@ -184,6 +106,15 @@ impl VM {
             pattern: pattern,
         }
     }
+
+    fn registers_dec_dt(&mut self) {
+        self.registers.dec_dt();
+    }
+
+    fn registers_dec_st(&mut self) {
+        self.registers.dec_st();
+    }
+
 }
 
 #[cfg(test)]

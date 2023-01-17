@@ -19,22 +19,6 @@ impl Default for Screen {
 }
 
 impl Screen {
-    pub(crate) fn set_pixel(&mut self, x: usize, y: usize) -> Result<(), VMError> {
-        if !self.check_bounds(x, y) {
-            return Err(VMError::ScreenOutOfBounds(x, y));
-        }
-        self.pixels[x][y] = true;
-        Ok(())
-    }
-
-    #[allow(unused)]
-    pub(crate) fn unset_pixel(&mut self, x: usize, y: usize) -> Result<(), VMError> {
-        if !self.check_bounds(x, y) {
-            return Err(VMError::ScreenOutOfBounds(x, y));
-        }
-        self.pixels[x][y] = false;
-        Ok(())
-    }
 
     pub(crate) fn is_pixel_set(&self, x: usize, y: usize) -> Result<bool, VMError> {
         if !self.check_bounds(x, y) {

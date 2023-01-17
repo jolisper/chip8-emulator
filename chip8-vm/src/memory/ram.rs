@@ -61,10 +61,6 @@ impl RAM {
         }
     }
 
-    pub(crate) fn get_ref(&self, offset: usize) -> &[u8] {
-        &self.memory[offset..]
-    }
-
     pub(crate) fn load_program(&mut self, buffer: &[u8]) -> Result<(), VMError> {
         if !(buffer.len() + CHIP8_PROGRAM_LOAD_ADDRESS < CHIP8_MEM_SIZE) {
             return Err(VMError::ProgramSizeOverflow);
@@ -96,5 +92,10 @@ impl RAM {
         }
         println!();
         std::io::stdout().flush().unwrap();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_ref(&self, offset: usize) -> &[u8] {
+        &self.memory[offset..]
     }
 }
