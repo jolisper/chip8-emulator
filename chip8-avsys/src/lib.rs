@@ -2,7 +2,6 @@ mod config;
 
 extern crate sdl2;
 
-use clap::Parser;
 use sdl2::audio::{AudioCallback, AudioSpec, AudioSpecDesired};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -12,7 +11,6 @@ use sdl2::render::Canvas;
 use sdl2::sys::SDL_KeyCode;
 use sdl2::video::Window;
 use sdl2::AudioSubsystem;
-use std::io::Read;
 
 use crate::config::*;
 use chip8_vm::{Signal, VM};
@@ -79,24 +77,24 @@ impl AudioCallback for SquareWave {
     }
 }
 
-#[derive(Parser)]
-struct Args {
-    rom_file: String,
-    debug: bool,
-}
+// #[derive(Parser)]
+// struct Args {
+//     rom_file: String,
+//     debug: bool,
+// }
 
-pub fn main() -> Result<(), String> {
-    let args = Args::parse();
-    let rom_file_name = args.rom_file;
-    let debug_mode = args.debug;
+pub fn start(rom: Vec<u8>, debug_mode: bool) -> Result<(), String> {
+    // let args = Args::parse();
+    // let rom_file_name = args.rom_file;
+    // let debug_mode = args.debug;
 
-    // Load ROM file
-    let mut file = std::fs::File::open(rom_file_name).unwrap();
-    let mut buf = Vec::new();
-    file.read_to_end(&mut buf).expect("read all ROM file");
+    // // Load ROM file
+    // let mut file = std::fs::File::open(rom_file_name).unwrap();
+    // let mut buf = Vec::new();
+    // file.read_to_end(&mut buf).expect("read all ROM file");
 
     let mut chip8: VM = VM::new();
-    chip8.load_program(&buf)?;
+    chip8.load_program(&rom)?;
 
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video()?;
