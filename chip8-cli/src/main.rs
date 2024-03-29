@@ -1,5 +1,5 @@
-use std::io::Read;
 use chip8_avsys;
+use std::io::Read;
 
 use clap::Parser;
 

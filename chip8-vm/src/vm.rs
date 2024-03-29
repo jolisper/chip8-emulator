@@ -114,7 +114,6 @@ impl VM {
     fn registers_dec_st(&mut self) {
         self.registers.dec_st();
     }
-
 }
 
 #[cfg(test)]

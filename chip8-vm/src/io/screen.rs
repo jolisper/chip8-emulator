@@ -19,7 +19,6 @@ impl Default for Screen {
 }
 
 impl Screen {
-
     pub(crate) fn is_pixel_set(&self, x: usize, y: usize) -> Result<bool, VMError> {
         if !self.check_bounds(x, y) {
             return Err(VMError::ScreenOutOfBounds(x, y));

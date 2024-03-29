@@ -86,7 +86,7 @@ type OpcodeInstructions = fn(cxt: &mut VMContext) -> Result<Signal, VMError>;
 /// Opcode dump function signature.
 type OpcodeDump = fn(ctx: &VMContext);
 
-/// The `OpcodeMatcher` holds a mapping between the matching info for a binary opcode and the 
+/// The `OpcodeMatcher` holds a mapping between the matching info for a binary opcode and the
 /// opcode instructions. Also holds the debugging functions for the opcode.
 pub struct OpcodeMatcher {
     bitmask: u16,
