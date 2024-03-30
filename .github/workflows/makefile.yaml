@@ -9,14 +9,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Build Docker Image from Devcontainer Definition
-        run: docker build . -f .devcontainer/Dockerfile -t devcontainer 
-
       - name: Run Tests 
-        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace devcontainer make test
+        run: make test
 
       - name: Run Build 
-        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace devcontainer make build 
+        run: make build 
         
       - name: Run Build (Windows)
-        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace devcontainer make build-windows
+        run: make build-windows
