@@ -13,7 +13,7 @@ jobs:
         run: docker build . -f .devcontainer/Dockerfile -t devcontainer 
 
       - name: Run Tests 
-        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace devcontainer make tests
+        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace devcontainer make test
 
       - name: Run Build 
         run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace devcontainer make build 
