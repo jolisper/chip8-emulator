@@ -1,0 +1,22 @@
+name: Run Makefile targets
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build Docker Image from Devcontainer Definition
+        run: docker build . -f .devcontainer/Dockerfile -t devcontainer 
+
+      - name: Run Tests 
+        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace mydevcontainer make tests
+
+      - name: Run Build 
+        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace mydevcontainer make build 
+        
+      - name: Run Build (Windows)
+        run: docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace mydevcontainer make build-windows
