@@ -8,4 +8,3 @@ edition = "2021"
 [dependencies]
 sdl2 = { version = "0.36.0", features = ["bundled"] }
 chip8-vm = { path = "../chip8-vm" }
-clap = { version = "3.1.6", features = ["derive"] }
