@@ -1,4 +1,9 @@
 SHELL := /bin/bash
+WORKSPACE := $(shell pwd)
+IMAGE := chip8-devcontainer
+USER := $(shell id -u)
+GROUP := $(shell id -g)
+
 .PHONY: help clean lint format test doc build run bump build-windows 
 
 help:
@@ -36,6 +41,16 @@ build-windows: ## Build for Windows
 	@mkdir -p build/windows
 	@cp target/x86_64-pc-windows-gnu/release/chip8-cli.exe build/windows/chip8.exe
 	@cp target/x86_64-pc-windows-gnu/release/SDL2.dll build/windows
+
+build-linux-with-docker: ## Build for Windows with Docker
+	@docker build . -f .devcontainer/Dockerfile -t $(IMAGE) 
+	@docker run --rm -v $(WORKSPACE):/workspace -w /workspace $(IMAGE) make build
+	@docker run --rm -v $(WORKSPACE):/workspace -w /workspace $(IMAGE) chown -R $(USER):$(GROUP) build target
+
+build-windows-with-docker: ## Build for Windows with Docker
+	@docker build . -f .devcontainer/Dockerfile -t $(IMAGE) 
+	@docker run --rm -v $(WORKSPACE):/workspace -w /workspace $(IMAGE) make build-windows
+	@docker run --rm -v $(WORKSPACE):/workspace -w /workspace $(IMAGE) chown -R $(USER):$(GROUP) build target
 
 all: clean lint format test doc build ## Build 
 
