@@ -92,7 +92,7 @@ pub fn start(rom: Vec<u8>, debug_mode: bool) -> Result<(), String> {
         .position_centered()
         .build()
         .map_err(|e| e.to_string())?;
-    let mut timer = sdl_context.timer()?;
+    let timer = sdl_context.timer()?;
 
     let audio_subsystem = sdl_context.audio()?;
     let device = build_audio_device(&audio_subsystem);
