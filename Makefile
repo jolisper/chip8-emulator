@@ -34,6 +34,7 @@ build: ## Build
 	cargo build --release
 	@mkdir -p build/linux
 	@cp target/release/chip8-cli build/linux/chip8
+	@cp target/release/libSDL2* build/linux/
 
 build-windows: ## Build for Windows
 	@rustup target add x86_64-pc-windows-gnu
